@@ -1,0 +1,12 @@
+{
+  "name": "tinyodyssey",
+  "version": "1.0.0",
+  "description": "An animated hex diorama of mythological Greece.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "terrain": "node tools/build-terrain.mjs",
+    "artifact": "node tools/make-artifact.mjs"
+  }
+}
