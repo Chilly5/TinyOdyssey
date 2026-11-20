@@ -486,7 +486,7 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
       }
       // High up there is only the wind, and it dies away on the way down. The sea is a sound of the ground:
       // nothing of it until the view is close, then the wash, the foam, the waves and the gulls together.
-      m.wind = 0.3 * far + 0.07 * mid;
+      m.wind = 0.12 * far + 0.03 * mid; // well under the song: air moving, not weather
       m.sea = 0.24 * shore * close;
       // People: a town's talk from the streets, and on top of it the market when the view is among the stalls.
       m.town = 0.3 * s.town * (0.3 * mid + close) * awake;
