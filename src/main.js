@@ -172,12 +172,22 @@ async function boot() {
     if (e.x > b[0] - 200 && e.x < b[2] + 200 && e.y > b[1] - 200 && e.y < b[3] + 300) sound.thunder(0.35 + 0.65 * smooth(0.2, 2, viewer.zoom));
   };
   const btnSound = $('btnSound'), btnTime = $('btnTime');
-  function setSound(want) {
+  const showSound = () => {
+    if (!btnSound) return;
+    btnSound.setAttribute('aria-pressed', String(sound.on));
+    btnSound.title = !sound.on ? 'Sound is off' : sound.awake || document.hidden ? 'Sound is on' : 'Sound is on: it starts with your first click or key press';
+  };
+  // remember: keep the choice for the next visit (the visitor's own choices are kept, the page's are not).
+  function setSound(want, remember = true) {
     const now = sound.set(want);
     if (now) hearSea();
-    btnSound?.setAttribute('aria-pressed', String(now));
-    if (btnSound) btnSound.title = now ? 'Sound is on' : 'Sound is off';
+    showSound();
+    if (remember) try { localStorage.setItem('tiny.sound', now ? 'on' : 'off'); } catch { /* fine */ }
   }
+  // Asleep: on, but the browser has not let it start yet. A press of the button or of M then wakes it
+  // (the press is what the browser was waiting for) and does not turn it off.
+  const toggleSound = () => setSound(sound.on && !sound.awake ? true : !sound.on);
+  sound.onstate = showSound;
   function setTime(mode) {
     timeMode = mode;
     if (!btnTime) return;
@@ -203,7 +213,21 @@ async function boot() {
     btnStyle.addEventListener('click', nextStyle);
     nameStyle(viewer.style);
   }
-  btnSound?.addEventListener('click', () => setSound(!sound.on));
+  btnSound?.addEventListener('click', toggleSound);
+  // Sound is on from the start, unless the visitor turned it off on an earlier visit. Where the browser
+  // holds it back, the first click, touch or key press anywhere on the page wakes it.
+  let wantSound = true;
+  try { wantSound = localStorage.getItem('tiny.sound') !== 'off'; } catch { /* private windows may refuse */ }
+  if (wantSound) {
+    setSound(true, false);
+    const firsts = ['pointerdown', 'pointerup', 'mousedown', 'touchend', 'keydown', 'click'];
+    const wake = (e) => {
+      if (sound.awake || !sound.on) { for (const n of firsts) removeEventListener(n, wake, true); return; }
+      if (e.target?.closest?.('#btnSound') || e.key === 'm' || e.key === 'M') return; // toggleSound has these
+      sound.set(true);
+    };
+    for (const n of firsts) addEventListener(n, wake, true);
+  }
   btnTime?.addEventListener('click', () => setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]));
   setTime(timeMode);
 
@@ -545,7 +569,7 @@ async function boot() {
     } else if (voyaging && e.key === 'ArrowRight') showStop(voyage.stop + 1);
     else if (voyaging && e.key === 'ArrowLeft') showStop(voyage.stop - 1);
     else if (e.key === 'v' || e.key === 'V') nextStyle();
-    else if (e.key === 'm' || e.key === 'M') setSound(!sound.on);
+    else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'n' || e.key === 'N') setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]);
     else if (e.key === 'p' || e.key === 'P') {
       viewer.setPixel(viewer.pixel ? 0 : 2);

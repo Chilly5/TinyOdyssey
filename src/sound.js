@@ -7,8 +7,11 @@
 //   close  down on the ground: the sea and its waves on the shore, the murmur of a town and its market (two recordings,
 //          src/audio/market.mp3 and village.mp3), and in the country leaves, cicadas, small birds, a
 //          woodpecker, bees, sheep; at night crickets, frogs, an owl
-// Nothing here plays a tune: the song is the only music. Nothing sounds until the visitor asks for it
-// (browsers would not allow it anyway).
+// Nothing here plays a tune: the song is the only music.
+//
+// The page turns the sound on as it opens. A browser lets nothing be heard until the visitor has clicked
+// or pressed a key, though, so until then the sound is on but asleep (see `awake`), and the page wakes it
+// with the first of those.
 
 const MUSIC = 0.5; // the song at its fullest
 const EFFECTS = 0.6; // everything else, against it
@@ -30,6 +33,7 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
 
   function build() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.onstatechange = () => { if (api.onstate) api.onstate(); };
     master = ctx.createGain();
     master.gain.value = 0;
     const limit = ctx.createDynamicsCompressor(); // thunder and a wave arriving together must not clip
@@ -388,7 +392,12 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
   const api = {
     get on() { return on; },
     get hasSong() { return !!(song && !song.dead); },
-    // Turn the sound on or off. Must be called from a click or a key press the first time.
+    // Whether it can be heard. On but not awake: the browser is holding it until the visitor clicks or
+    // presses a key; set(true) from inside one of those wakes it.
+    get awake() { return on && !!ctx && ctx.state === 'running'; },
+    onstate: null, // called when it wakes, or is put to sleep
+    // Turn the sound on or off. Turning it on outside a click or a key press may leave it asleep; calling
+    // again from one wakes it.
     set(want) {
       if (want && !ctx) {
         try { build(); } catch { return false; }

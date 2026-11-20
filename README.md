@@ -81,7 +81,7 @@ The people, animals and ships are small models built and rendered in **Blender**
 
 **Day and night** (`src/main.js`, the last shader in `src/viewer.js`). A day is five minutes. At dusk the light warms, then the picture cools and darkens, a lamp comes on at every house and fire (their places come from the town plan), most people go indoors and the birds roost. **N** or the button holds it at day or night.
 
-Thunder sounds when Zeus throws, at any height. Sound is off until asked for (**M** or the button).
+Thunder sounds when Zeus throws, at any height. Sound is on by default. A browser lets a page make no sound until it has been clicked or a key pressed, so it starts with the visitor's first click, touch or key press (at once, where the browser already allows it). **M** or the button turns it off, and the choice is kept for the next visit.
 
 A last pass adds bloom on whatever is nearly white or hot, a contrast curve, and a tilt-shift blur towards the top and bottom of the screen. Both ease off as you zoom in.
 
