@@ -10,6 +10,7 @@
     "cond": "node gen/build.mjs --cond",
     "spots": "node gen/build.mjs --spots",
     "refresh": "node gen/build.mjs --refresh",
+    "pyramid": "node tools/pyramid.mjs",
     "deploy": "node tools/deploy.mjs"
   },
   "devDependencies": {

@@ -14,7 +14,7 @@ import { Geo, rgb } from './kit.js';
 import { C } from './models.js';
 import { MODELS } from './landmarks.js';
 import { rampFrom, levelOf, pack, R } from './palette.mjs';
-import { mulberry32 } from '../src/util.js';
+import { mulberry32, hash2, noise2 } from '../src/util.js';
 import { KZ, KY } from './region.mjs';
 
 const toSRGB = (v) => Math.round(255 * Math.min(1, Math.max(0, v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)));
@@ -113,6 +113,134 @@ export class Splats {
   }
 }
 
+// What a surface of a landmark is made of, guessed from its colour and which way it faces, so that
+// at the finer scales marble has joints, a roof has rows of tiles and foliage is mottled.
+function surface(r, g, b, ny) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (g > r * 1.08 && g > b * 1.1) return 3; // leaves
+  if (r > g * 1.3 && r > b * 1.6 && r > 150 && ny > 0.15 && ny < 0.97) return 2; // a tiled roof
+  if (mx - mn < 46 && mx > 120) return ny > 0.9 ? 4 : 1; // paving, or dressed stone
+  return 0;
+}
+
+// A landmark that keeps its triangles and samples them straight into a picture when asked.
+function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, snap }) {
+  const F = snap;
+  const meshes = [{ pos: g.pos, col: g.col, n: g.n, el: null, glow: false }];
+  for (const d of still) {
+    const geo = d.mesh.geometry;
+    meshes.push({ pos: geo.attributes.position.array, col: geo.attributes.color.array, n: geo.attributes.position.count, el: d.mesh.matrixWorld.elements, glow: d.glow });
+  }
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  const P = (out, m, i) => {
+    let x = m.pos[i], y = m.pos[i + 1], z = m.pos[i + 2];
+    const el = m.el;
+    if (el) {
+      const tx = el[0] * x + el[4] * y + el[8] * z + el[12], ty = el[1] * x + el[5] * y + el[9] * z + el[13];
+      z = el[2] * x + el[6] * y + el[10] * z + el[14];
+      x = tx; y = ty;
+    }
+    out[0] = x * modelPx; out[1] = y * modelPx; out[2] = z * modelPx;
+  };
+  const a = [0, 0, 0], b = [0, 0, 0], c = [0, 0, 0];
+  for (const m of meshes) for (let i = 0; i < m.n * 3; i += 3) {
+    P(a, m, i);
+    if (a[0] < x0) x0 = a[0];
+    if (a[0] > x1) x1 = a[0];
+    if (a[2] < z0) z0 = a[2];
+    if (a[2] > z1) z1 = a[2];
+  }
+  const course = Math.max(3, Math.round(F * 0.7)), tile = Math.max(2, Math.round(F * 0.42));
+  return {
+    site: s, bx, by, bz,
+    draw(ctx) {
+      const { img, zb, iw, X0, Z0, X1, Z1, iy0, shaded, toB, look } = ctx;
+      if (bx + x1 + 40 * F < X0 || bx + x0 - 40 * F >= X1 || bz + z1 + 40 * F < Z0 || bz + z0 - 40 * F >= Z1) return;
+      for (const m of meshes) {
+        for (let i = 0; i < m.n * 3; i += 9) {
+          P(a, m, i); P(b, m, i + 3); P(c, m, i + 6);
+          if (Math.max(a[2], b[2], c[2]) + bz < Z0 - 1 || Math.min(a[2], b[2], c[2]) + bz > Z1 || Math.max(a[0], b[0], c[0]) + bx < X0 - 1 || Math.min(a[0], b[0], c[0]) + bx > X1) continue;
+          const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2];
+          const e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
+          let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+          const l = Math.hypot(nx, ny, nz);
+          if (l < 1e-9) continue;
+          nx /= l; ny /= l; nz /= l;
+          if (ny * KZ + nz * KY <= 0.02) continue; // faces away from the camera
+          const r8 = toSRGB(m.col[i]), g8 = toSRGB(m.col[i + 1]), b8 = toSRGB(m.col[i + 2]);
+          const ramp = look.ramp(rampFrom(r8, g8, b8));
+          const level0 = m.glow ? 3 : levelOf(nx, ny, nz);
+          const lit = m.glow || ny <= 0.6; // only upward faces take cast shadows
+          const kind = F >= 4 && look.texture && !m.glow ? surface(r8, g8, b8, ny) : -1; // -1: plain
+          const n1 = Math.max(1, Math.ceil(Math.hypot(e1x, e1y, e1z) / 0.45));
+          const n2 = Math.max(1, Math.ceil(Math.hypot(e2x, e2y, e2z) / 0.45));
+          for (let p1 = 0; p1 <= n1; p1++) {
+            const u = p1 / n1;
+            const jm = Math.round(n2 * (1 - u));
+            for (let p2 = 0; p2 <= jm; p2++) {
+              const v = p2 / n2;
+              const gx = bx + Math.round(a[0] + e1x * u + e2x * v - nx * 0.2);
+              if (gx < X0 || gx >= X1) continue;
+              const gz = bz + Math.round(a[2] + e1z * u + e2z * v - nz * 0.2);
+              if (gz < Z0 || gz >= Z1) continue;
+              const gy = by + Math.round(a[1] + e1y * u + e2y * v - ny * 0.2);
+              const p = (Math.round(KZ * gz - KY * gy) - iy0) * iw + gx - X0;
+              const zr = gz - Z0 + 1;
+              if (zb[p] > zr) continue;
+              let level = level0;
+              if (kind === 1) { // dressed stone: courses, the joints staggered
+                const row = Math.floor(gy / course);
+                if (gy % course === 0 || (gx + gz + (row & 1) * course) % (course * 2) === 0) level--;
+                else if (hash2((gx + gz + (row & 1) * course) / (course * 2) | 0, row, 171) < 0.14) level++;
+              } else if (kind === 4) { // paving
+                if (gx % (course * 2) === 0 || gz % (course * 2) === 0) level--;
+              } else if (kind === 2) { // tiles: a shadow under each row and a lit lip above it
+                const t = gy % tile;
+                if (t === 0) level--;
+                else if (t === 1 && tile > 2) level++;
+                else if (F >= 8 && (gx + ((gy / tile) | 0) % 2 * (tile >> 1)) % tile === 0) level--;
+              } else if (kind === 3) {
+                level += Math.round((noise2(gx / (F * 0.5) + gy * 0.31, gz / (F * 0.5) + gy * 0.47, 173) - 0.5) * 2.4);
+              } else if (kind === 0 && F >= 4) { // anything else: weathered in broad patches, with a fleck here and there
+                const n = noise2((gx + gz * 0.4) / (F * 2.4), (gy + gz * 0.7) / (F * 1.1), 174);
+                if (n > 0.8) level++;
+                else if (n < 0.17) level--;
+                else if (hash2(gx >> 1, (gy + gz) >> 1, 175) < 0.03) level--;
+              }
+              if (!lit && shaded(toB(gx), toB(gz), (gy / F) * 8 + 6)) level -= 2;
+              img[p] = ramp[level < 0 ? 0 : level > 4 ? 4 : level];
+              zb[p] = zr;
+            }
+          }
+        }
+      }
+      // Its trees, each rebuilt at this scale.
+      for (const t of treeList) {
+        const [list, ramps0] = TREES[t.name] || TREES.oak;
+        const idx = Math.min(list.length - 1, Math.max(0, Math.round((t.scale - 0.7) / 0.14)));
+        const st = list[idx % list.length].at(F);
+        const ramps = look.ramps(ramps0);
+        const ox = bx + Math.round(t.x * modelPx) + (F >> 1), oy = by + Math.round(t.y * modelPx), oz = bz + Math.round(t.z * modelPx) + (F >> 1);
+        if (oz + 24 * F < Z0 || oz - 24 * F >= Z1 || ox + 24 * F < X0 || ox - 24 * F >= X1) continue;
+        for (let v = 0; v < st.n; v++) {
+          const gz = oz + st.dz[v];
+          if (gz < Z0 || gz >= Z1) continue;
+          const gx = ox + st.dx[v];
+          if (gx < X0 || gx >= X1) continue;
+          const gy = oy + st.dy[v];
+          const p = (Math.round(KZ * gz - KY * gy) - iy0) * iw + gx - X0;
+          const zr = gz - Z0 + 1;
+          if (zb[p] > zr) continue;
+          const c = ramps[st.part[v]][(look.texture ? st.lv : st.lp)[v]];
+          img[p] = c;
+          zb[p] = zr;
+          if (F > 1 && p + iw < img.length && zb[p + iw] < zr) { img[p + iw] = c; zb[p + iw] = zr; } // its front: see fine.mjs
+        }
+      }
+    },
+  };
+}
+
 // Draw packed splats, positioned at voxel (bx, by, bz), into a region's buffers.
 function splatInto(sp, bx, by, bz, ctx) {
   const { img, zb, iw, gx0, gz0, gx1, gz1, iy0, ceilAt, ex0, ez0 } = ctx;
@@ -134,7 +262,10 @@ function splatInto(sp, bx, by, bz, ctx) {
 
 // snap > 1 keeps every anchor on a multiple of snap voxels and enlarges tree stamps to match:
 // that is how the same landmarks are baked at a finer scale for the painter.
-export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap = 1 }) {
+// direct: do not turn the models into splats here. Keep their triangles, and let each landmark draw
+// itself straight into a picture when asked (.draw): that is how the finer scales are made (gen/fine.mjs),
+// where a temple is hundreds of pixels across and its splats would be counted in millions.
+export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap = 1, direct = false }) {
   const S = renderer.S;
   const T0 = 3.0; // the moment the still image shows
   const T = { olive: new Geo().box(0, 0, 0, 0.06, 0.2, 0.06, C.woodD).blob(0, 0.36, 0, 0.26, 0.2, 0.24, rgb('#93b17e'), { dark: rgb('#4c6f51') }) };
@@ -201,6 +332,14 @@ export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap =
     for (const f of ticks) f(T0, 0.016);
     group.updateMatrixWorld(true);
 
+    if (direct) {
+      const still = dynamic.length && ticks.length && ANIMATED[s.model] ? [] : dynamic.filter((d) => {
+        for (let o = d.mesh; o; o = o.parent) if (!o.visible) return false;
+        return true;
+      });
+      out.push(directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, snap }));
+      continue;
+    }
     const fixed = new Splats();
     fixed.mesh(g.pos, g.col, g.n, modelPx, null, false);
     for (const t of treeList) {

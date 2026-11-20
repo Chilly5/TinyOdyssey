@@ -9,10 +9,8 @@ paint/work/
 
 # Built, and large. The finished site is published from the gh-pages branch (npm run deploy).
 world/
-world.next/
-world.old/
+world.*/
 units/anims/
 
 units/out/
 __pycache__/
-world.prev/

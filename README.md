@@ -1,10 +1,12 @@
 # TinyOdyssey
 
-An animated voxel-art map of mythological Greece. It is one picture, 47,424 × 18,652 pixels across the whole map, with all the land painted again at twice that scale and the towns and landmarks at four times, and the closer you zoom the more there is to see.
+An animated map of mythological Greece that you zoom into: a 3D scene of small cubes, rendered through one fixed camera into pictures. Every zoom level is its own render of the same scene at a finer grain, so zooming in does not enlarge pixels, it finds more: a house gains its door, then its shutters and roof tiles.
+
+It comes in three styles (the button, or **V**): **pixel art**, **terraces** (clean stacked layers, like a model cut from coloured card), and an earlier **painted** version in which an image model redrew the render.
 
 Click a place to read its myth. Zoom into a town to find its streets, its market and the smaller stories nearby. Press **Sail the Odyssey** to follow Odysseus home from Troy in seventeen stops. A day lasts five minutes: at dusk the lamps come on. Turn the sound on for the sea, the birds and a lyre where the Muses are.
 
-Inspired by [hexagonal.earth](https://hexagonal.earth/), and made the way the isometric city maps are: [isometric.nyc](https://isometric.nyc), [tiny.london](https://tiny.london/how/), [Pixel Singapore](https://www.yadongxie.com/blog/how-isometric-pixel-city-was-made) and [Isometric SF](https://www.justinchavez.com/blog/isometric-sf-how/).
+Inspired by [hexagonal.earth](https://hexagonal.earth/) and made the way it is. The painted style follows the isometric city maps instead: [isometric.nyc](https://isometric.nyc), [tiny.london](https://tiny.london/how/), [Pixel Singapore](https://www.yadongxie.com/blog/how-isometric-pixel-city-was-made) and [Isometric SF](https://www.justinchavez.com/blog/isometric-sf-how/).
 
 ## Run it
 
@@ -30,7 +32,18 @@ Links can point at a place: `…/#olympus` opens Mount Olympus, `…/#odyssey` s
 
 ## How the picture is made
 
-Those city maps render a real 3D model of a city through one fixed camera and have an image model redraw the render in a chosen style. Mythological Greece has no 3D scan, so here the model is built first.
+The method is the one [hexagonal.earth](https://hexagonal.earth/) describes in [Every "one shot" is slop](https://blog.vandesande.design/every-one-shot-is-slop): the world is a cloud of coloured points in space (pixel splats), each zoom level renders the scene again in more detail, and what the browser shows is those renders as static tiles.
+
+1. **Real terrain.** `gen/dem.mjs` and `gen/fields.mjs`: elevation and sea depth, distance to the shore, a climate, rivers, and a smoothed copy of the high ground so that mountains are broad stepped massifs.
+2. **The settled country.** `gen/plan.mjs`: a town round each great site (streets, a market, houses, sometimes a wall and a pier) and roads between places found with A*. It keeps the shapes as well as the cells, so they can be drawn again finer.
+3. **The scene at one voxel to the map pixel.** `gen/region.mjs` terraces the ground, lays out fields, scatters trees and villages, and sweeps shadows across. This layout is the truth every finer level is drawn from, and where the walkers' paths and the height tiles come from.
+4. **The same scene, finer.** `gen/fine.mjs` draws any part of it with 2, 4, 8 or 16 voxels to that one. Nothing is enlarged: the ground's height is asked again at the finer points and cut into the same terraces, so their edges are smooth lines; roads, walls and rivers are drawn again from their shapes; fields get their rows; and every tree, house, stall and boat rebuilds itself at that scale (`gen/stamps.mjs`: each object is built from the same random numbers at any size, with the detail that only shows when it is large). Landmark models are sampled again as finely as needed (`gen/bake.mjs`), with joints in their stone and rows of tiles on their roofs.
+5. **Two looks** (`gen/looks.mjs`). The same scene and camera; a look chooses the colours and the finish. *Pixel art*: hand-built colour ramps, dithered sea, mottled ground, bedded cliffs, and a dark line wherever one thing stands in front of another. *Terraces*: flat pastel tops, the edge of each layer a tone deeper, a pale lip along every ledge, no texture and no outlines.
+6. **Tiles.** `gen/pyramid.mjs` renders the whole map at scales 1, 2 and 4 and every town, landmark and minor place at 8 and 16, each level natively, and cuts them into 512-pixel tiles. `tools/pyramid.mjs` shares the work out between the processor's cores.
+
+### The painted version
+
+Before that, the picture was made the way the isometric city maps are: an image model redrew the render. It is still there as the third style.
 
 1. **Real terrain.** `gen/dem.mjs` assembles elevation and sea depth for 10°E to 30.9°E, 32.3°N to 42.3°N. `gen/fields.mjs` works out distance to the shore, a climate, the rivers, and a smoothed copy of the high ground: heights are stretched about seven times, and real relief stretched that much is a forest of needles, so mountains are drawn from the smoothed copy as broad stepped massifs.
 2. **The settled country.** `gen/plan.mjs` wraps a town round each great site (streets, a market, houses in rows, sometimes a wall and a pier) and joins the places with roads found over the ground with A*.
@@ -73,7 +86,15 @@ There are two ways to show the picture. The usual one is smooth: one painted pix
 
 ```
 npm install                 # three.js, used only for its maths while baking models
-npm run world               # the render, sprites, units, paths, routes -> world/   (1 minute)
+npm run world               # sprites, units, paths, height tiles, routes -> world/   (1 minute)
+npm run pyramid             # the picture, both looks, every level -> world/pixel, world/voxel   (about 16 minutes, nine jobs at a time)
+```
+
+That is the whole of it for the two drawn styles. `node gen/build.mjs --fine 16 --preview 23.72,37.97,60,44 --look voxel --out x.png` draws one window of the map at one scale, for looking at.
+
+The painted style needs a GPU and several hours:
+
+```
 npm run cond                # what the painter is shown -> paint/work/cond          (1 minute)
 node gen/build.mjs --spots  # the places to paint in finer detail -> paint/work/spots.json
 cd paint
@@ -84,6 +105,8 @@ python minor.py                     # the minor places, put right    (about 5 mi
 python detail.py --level 16         # the towns' cores, finer still  (about 70 minutes)
 python tiles.py                     # tiles -> world/tiles, and world/manifest.json   (about 20 minutes)
 ```
+
+After `python tiles.py`, run `node gen/build.mjs --pyramid --styles` so the manifest lists the painted picture beside the drawn ones.
 
 `node gen/build.mjs --refresh` redoes everything in `world/` except the picture: the paths, the height tiles, the lamps, the sprites and the labels. `node gen/build.mjs --overlays` redoes only what is drawn over the picture (sprites, the landmarks' animation, the units). Both leave the sprite sheets as PNG; `python tiles.py --sheets` packs them again.
 
@@ -133,6 +156,9 @@ python paint.py --resume                                                   # car
 | What a landmark is made of | `gen/landmarks.js`, `gen/minor.js`, `gen/models.js` | world, cond, paint, detail, tiles |
 | What the painter is told about a landmark | `paint/hints.json`; for a minor place, its `paint` line in `src/minor.js` | paint, detail, tiles (minor places: cond, minor, tiles) |
 | The painting's style | the prompts at the top of `paint/paint.py` and `paint/detail.py` | paint, detail, tiles |
+| How a tree or a house looks close up | its builder in `gen/stamps.mjs` (the branch for F above 1) | pyramid |
+| The colours and finish of a drawn style | `gen/looks.mjs` | pyramid |
+| How far in the drawn styles go, and where | `FULL`, `SPARSE` and the places in `gen/pyramid.mjs` and `gen/build.mjs` | pyramid |
 | Terrain, climate, colours, what grows where | `gen/region.mjs`, `gen/fields.mjs`, `gen/palette.mjs` | world, cond, paint, detail, tiles |
 | Who walks where | `gen/life.mjs` (paths), `src/life.js` (who, how many, how fast, who stays out at night) | refresh for paths; reload for the rest |
 | What the units look like | `units/build.py` | Blender, then overlays |

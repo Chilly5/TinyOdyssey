@@ -70,6 +70,79 @@ if (sheet) {
   });
   fs.writeFileSync(path.resolve(sheet), encodePNG(CW * COLS, CH * rows, new Uint8Array(out.buffer)));
   lap('sheet');
+} else if (process.argv.includes('--pyramid')) {
+  // node gen/build.mjs --pyramid [--out WORLD] [--look pixel,voxel] [--scales 1,2,4,8,16] [--places athens,troy]
+  // The picture itself: every zoom level drawn natively, in each look, into WORLD/<look>/ (gen/pyramid.mjs).
+  // The scales do not depend on one another, so they can be run side by side, one process each, and
+  // `--pyramid --styles` run afterwards to write what was made into the manifest.
+  const { createFine } = await import('./fine.mjs');
+  const { LOOKS } = await import('./looks.mjs');
+  const { buildPyramid, pyramidOf } = await import('./pyramid.mjs');
+  const out = path.join(ROOT, arg('out', 'world'));
+  // Without the faint hex grid the whole-map render lays over everything.
+  const plain = createRenderer({ fields, sites, stamps, S, landmarks, rivers: fields.rivers, grid: false, lap });
+  const marks = new Map();
+  const landmarksAt = (F) => {
+    if (!marks.has(F)) {
+      const stub = { S: S * F, OY: plain.OY * F, quant: (v) => plain.quant(v / F) * F, heightOf: (m) => plain.heightOf(m) * F };
+      marks.set(F, bakeLandmarks({ sites, fields, renderer: stub, stamps, modelPx: MODEL_PX * F, snap: F, direct: true }).landmarks);
+    }
+    return marks.get(F);
+  };
+  const fine = createFine({ base: plain, fields, rivers: fields.rivers, landmarksAt });
+  // Where to go deeper: round every place, a little wider than its own ground and as tall as what stands on it.
+  const wanted = arg('places') ? arg('places').split(',') : null;
+  const places = [];
+  for (const st of sites) {
+    if (st.x == null || (wanted && !wanted.includes(st.id))) continue;
+    const lm = landmarks.find((l) => l.site.id === st.id);
+    const hv = st.sea ? 0 : plain.quant(plain.heightOf(Math.max(1, st.elev)));
+    const x = st.x * S, y = plain.OY + KZ * st.z * S - 0.8 * hv;
+    const wide = lm && lm.gx1 >= lm.gx0 ? Math.max(lm.bx - lm.gx0, lm.gx1 - lm.bx) : 0;
+    const hw = Math.max((st.RT || st.R || 0) * S, wide) + 12;
+    places.push({ x0: x - hw, x1: x + hw, y0: y - Math.max(lm ? lm.height : 0, hw * 0.62) - 12, y1: y + Math.max(lm ? lm.below : 0, hw * 0.62) + 14 });
+  }
+  const mf = path.join(out, 'manifest.json');
+  if (!process.argv.includes('--styles')) {
+    for (const name of arg('look', 'pixel,voxel').split(',')) {
+      buildPyramid({ base: plain, fine, look: LOOKS[name], out: path.join(out, name), places, lap, only: arg('scales') ? arg('scales').split(',').map(Number) : null,
+        rows: arg('rows') ? arg('rows').split(',').map(Number) : null, part: arg('part') ? arg('part').split('/').map(Number) : null });
+    }
+  }
+  // --styles (or a run of every scale): tell the world which pictures it has. The drawn ones first; the
+  // painted one, if tiles.py has made it, stays on offer after them.
+  if (fs.existsSync(mf) && (process.argv.includes('--styles') || (!arg('scales') && !wanted))) {
+    const man = JSON.parse(fs.readFileSync(mf, 'utf8'));
+    const styles = {};
+    for (const name of Object.keys(LOOKS)) if (fs.existsSync(path.join(out, name, 'scale-1.json'))) styles[name] = { dir: name, ...pyramidOf(path.join(out, name)) };
+    if (man.paint) styles.painted = { dir: 'tiles', ...man.paint };
+    man.styles = styles;
+    man.version = Date.now().toString(36);
+    fs.writeFileSync(mf, JSON.stringify(man));
+    lap(`styles: ${Object.keys(styles).join(', ')}`);
+  }
+} else if (preview && arg('fine')) {
+  // node gen/build.mjs --fine 4 --preview LON,LAT,W,H [--look pixel|voxel] --out FILE.png
+  // The same window of the map (W x H map pixels), drawn 4 times finer.
+  const { createFine } = await import('./fine.mjs');
+  const { LOOKS } = await import('./looks.mjs');
+  const F = Number(arg('fine'));
+  const [lon, lat, w = 200, h = 140] = preview.split(',').map(Number);
+  const [x, z] = lonLatToWorld(lon, lat);
+  const gx0 = Math.round(x * S - w / 2), gx1 = gx0 + w;
+  const gz0 = Math.round(z * S - h / 2 / KZ), gz1 = Math.round(z * S + h / 2 / KZ);
+  const fineStub = { S: S * F, OY: renderer.OY * F, quant: (v) => renderer.quant(v / F) * F, heightOf: (m) => renderer.heightOf(m) * F };
+  const marks = bakeLandmarks({ sites, fields, renderer: fineStub, stamps, modelPx: MODEL_PX * F, snap: F, direct: true }).landmarks;
+  const fine = createFine({ base: renderer, fields, rivers: fields.rivers, landmarksAt: () => marks });
+  const r = fine.render(gx0, gz0, gx1, gz1, F, LOOKS[arg('look', 'pixel')]);
+  lap(`fine region ${r.iw} x ${r.ih}`);
+  const top = Math.round(KZ * gz0 * F) - (r.iy0 - renderer.OY * F);
+  const rows = Math.min(r.ih - top, h * F);
+  const out = new Uint32Array(r.iw * rows);
+  for (let i = 0; i < out.length; i++) out[i] = (r.img[top * r.iw + i] || 0xff2e1215) | 0xff000000;
+  const file = path.resolve(arg('out', 'preview.png'));
+  fs.writeFileSync(file, encodePNG(r.iw, rows, new Uint8Array(out.buffer)));
+  lap(`wrote ${file}`);
 } else if (preview) {
   const [lon, lat, w = 1200, h = 800] = preview.split(',').map(Number);
   const [x, z] = lonLatToWorld(lon, lat);

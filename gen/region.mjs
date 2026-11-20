@@ -16,14 +16,14 @@ import { buildPlan, PF } from './plan.mjs';
 
 export const KZ = 0.6, KY = 0.8;
 
-const B = { SEA: 0, BEACH: 1, DESERT: 2, STEPPE: 3, SCRUB: 4, MEADOW: 5, FOREST: 6, HIGHLAND: 7, ROCK: 8, SNOW: 9, WHEAT: 10, CROP: 11, SOIL: 12, VINE: 13, YARD: 14, RIVER: 15, ROAD: 16, PAVED: 17, MASON: 18, PLANK: 19 };
-const YARD = Uint32Array.from(['#77664f', '#a28c66', '#c8b486', '#e1d1a4', '#f2e8c6'].map((s) => {
+export const B = { SEA: 0, BEACH: 1, DESERT: 2, STEPPE: 3, SCRUB: 4, MEADOW: 5, FOREST: 6, HIGHLAND: 7, ROCK: 8, SNOW: 9, WHEAT: 10, CROP: 11, SOIL: 12, VINE: 13, YARD: 14, RIVER: 15, ROAD: 16, PAVED: 17, MASON: 18, PLANK: 19 };
+export const YARD = Uint32Array.from(['#77664f', '#a28c66', '#c8b486', '#e1d1a4', '#f2e8c6'].map((s) => {
   const v = parseInt(s.slice(1), 16);
   return pack((v >> 16) & 255, (v >> 8) & 255, v & 255);
 }));
-const TOP = [null, R.beach, R.desert, R.steppe, R.scrub, R.grass, R.forest, R.highland, R.rock, R.snow, R.wheat, R.crop, R.soil, R.vine, YARD, null, R.road, R.paved, R.stone, R.plank];
-const WALL = [null, R.clay, R.clay, R.clay, R.dirt, R.dirt, R.dirt, R.rock, R.rock, R.rock, R.dirt, R.dirt, R.dirt, R.dirt, R.clay, R.rock, R.dirt, R.stone, R.stone, R.plank];
-const F_CLEAR = 1, F_KEEP = 2, F_BANK = 4;
+export const TOP = [null, R.beach, R.desert, R.steppe, R.scrub, R.grass, R.forest, R.highland, R.rock, R.snow, R.wheat, R.crop, R.soil, R.vine, YARD, null, R.road, R.paved, R.stone, R.plank];
+export const WALL = [null, R.clay, R.clay, R.clay, R.dirt, R.dirt, R.dirt, R.rock, R.rock, R.rock, R.dirt, R.dirt, R.dirt, R.dirt, R.clay, R.rock, R.dirt, R.stone, R.stone, R.plank];
+export const F_CLEAR = 1, F_KEEP = 2, F_BANK = 4, F_FARM = 8;
 
 // Blend of a packed colour towards (r, g, b), cached: the hex grid lines and shadowed sea use it.
 const TINTS = { shade: [24, 40, 110, 0.3], seaLine: [255, 255, 255, 0.13], landLine: [30, 26, 70, 0.2] };
@@ -82,7 +82,7 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
     if (e > -40 && e < 40) e += (noise2(gx / 5.3, gz / 5.3, 61) - 0.5) * 9 + (noise2(gx / 17, gz / 17, 62) - 0.5) * 8;
     gE = e;
     if (e <= 0) return 0;
-    const list = siteAt.get((gz >> 7) * 4096 + (gx >> 7));
+    const list = siteAt.get((Math.floor(gz) >> 7) * 4096 + (Math.floor(gx) >> 7));
     if (list) {
       for (const s of list) {
         const d = Math.hypot(gx + 0.5 - s.x * S, gz + 0.5 - s.z * S) / S;
@@ -124,7 +124,9 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
     return (0.5 - Math.max(dx, dx * 0.5 + dz * 0.8660254)) * HEXW;
   };
 
-  function renderRegion(gx0, gz0, gx1, gz1) {
+  // opts.layout: stop once the ground and everything standing on it is worked out, and hand that back
+  // (as .lay) without drawing it: the finer scales (gen/fine.mjs) draw the same layout their own way.
+  function renderRegion(gx0, gz0, gx1, gz1, opts = {}) {
     const MWEST = SHADOW_REACH, MNORTH = SHADOW_REACH, MEAST = 36, MSOUTH = 36;
     const ex0 = gx0 - MWEST, ez0 = gz0 - MNORTH, ex1 = gx1 + MEAST, ez1 = gz1 + MSOUTH;
     const ew = ex1 - ex0, ed = ez1 - ez0, EN = ew * ed;
@@ -190,6 +192,7 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
           const ph = hash2(px, pz, 43);
           if (ph < 0.78) {
             farmed = true;
+            flag[k] |= F_FARM;
             const ex = (gx + (pz & 1) * 8) % 17, ezz = ((gz % 11) + 11) % 11;
             if (ex === 0 || ezz === 0) { b = B.SCRUB; level = 2; } // hedge
             else if (ph < 0.3) { b = B.WHEAT; level = ezz % 3 === 0 ? 2 : (hash2(gx, gz, 44) < 0.25 ? 4 : 3); }
@@ -513,6 +516,8 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
     // Shadow ceiling arriving at cell (i, j), x8. Anything below it is in shade.
     const ceilAt = (i, j) => (i > 0 && j > 0 ? sh[(j - 1) * ew + i - 1] - DROP8 : -30000);
 
+    if (opts.layout) return { lay: { ex0, ez0, ew, ed, HF, EL, H, mat, lvl, flag, lean, wlean, inst, sh } };
+
     // --- 7. Flatten to pixels -------------------------------------------------------------
     const iw = gx1 - gx0;
     const iy0 = Math.floor(KZ * gz0) - Math.ceil(KY * MAXTOP);
@@ -636,5 +641,5 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
     return e > 0 ? quant(heightOf(e)) : 0;
   };
 
-  return { renderRegion, project, groundHeight, ground, plan: getPlan, heightOf, quant, GW, GD, IW, IH, OY, S };
+  return { renderRegion, project, groundHeight, ground, groundE: () => gE, groundF: () => gF, plan: getPlan, heightOf, quant, GW, GD, IW, IH, OY, S, MAXTOP, BASE, DROP8 };
 }

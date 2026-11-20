@@ -5,10 +5,11 @@
 // bloom, a contrast curve and a tilt-shift blur. At night it darkens and cools the
 // whole picture and lets lamps (viewer.setLights) light what is round them.
 //
-// Positions everywhere are in "map pixels", the grid of the splat render. The
-// painted picture is several times finer than that, and finer still round the
-// towns and landmarks, where extra levels of tiles exist (manifest.paint);
-// only the tile code here needs to know.
+// Positions everywhere are in "map pixels", the grid of the whole-map render. The
+// picture exists several times finer than that, and finer still round the towns
+// and landmarks, where extra levels of tiles exist; only the tile code here needs
+// to know. A world can hold the picture in more than one style (manifest.styles:
+// pixel art, stacked terraces, the painted version), each a pyramid of its own.
 
 const VS_QUAD = `#version 300 es
 in vec2 a;
@@ -305,13 +306,20 @@ export function createViewer(canvas, manifest, base) {
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' });
   if (!gl) throw new Error('WebGL2 is not available');
   const M = manifest;
-  // The painted pyramid if there is one, else the splat render's own tiles.
-  const P = M.paint || { detail: 1, ext: 'png', tile: M.tile, levels: M.levels };
-  const D = P.detail, LV = P.levels, TS = P.tile;
-  const BASE_D = P.base || D; // the detail of the level that covers the whole map
-  const maxLevel = LV.length - 1;
-  // The finest levels only have tiles where something was painted in more detail.
-  const sparse = LV.map((l) => (l.tiles ? new Set(l.tiles) : null));
+  // The styles the picture comes in. An older world has one: the painted pyramid, or the plain render's tiles.
+  const STYLES = M.styles || { painted: { dir: 'tiles', ...(M.paint || { detail: 1, ext: 'png', tile: M.tile, levels: M.levels }) } };
+  // These describe the pyramid being shown, and change together when the style does (setStyle).
+  let P, D, LV, TS, BASE_D, maxLevel, sparse, NATIVE;
+  const usePyramid = (name) => {
+    P = STYLES[name];
+    D = P.detail; LV = P.levels; TS = P.tile;
+    BASE_D = P.base || D; // the detail of the level that covers the whole map
+    maxLevel = LV.length - 1;
+    // The finest levels only have tiles where something was drawn in more detail.
+    sparse = LV.map((l) => (l.tiles ? new Set(l.tiles) : null));
+    NATIVE = P.dir !== 'tiles'; // every level drawn in its own pixels (not a painting, which is smooth)
+  };
+  usePyramid(Object.keys(STYLES)[0]);
   const exists = (L, x, y) => !sparse[L] || sparse[L].has(x + '_' + y);
   // The finest level that has a tile at a point of the map.
   const finestAt = (x, y) => {
@@ -418,6 +426,7 @@ export function createViewer(canvas, manifest, base) {
   const queue = [];
   let loading = 0;
   let tick = 0;
+  let era = 0; // goes up when the style changes: tiles asked for before then are no longer wanted
   const key = (L, x, y) => `${L}/${x}_${y}`;
   const pump = () => {
     while (loading < 6 && queue.length) {
@@ -432,7 +441,9 @@ export function createViewer(canvas, manifest, base) {
       }
       loading++;
       t.state = 1;
-      loadBitmap(`${base}tiles/${job.k}.${P.ext}?v=${M.version}`, false).then((bmp) => {
+      const asked = era;
+      loadBitmap(`${base}${P.dir}/${job.k}.${P.ext}?v=${M.version}`, false).then((bmp) => {
+        if (asked !== era) { bmp.close?.(); return; }
         t.tex = texture();
         upload(t.tex, bmp);
         if (D > 1) { // painted detail shimmers when shrunk unless it is filtered
@@ -582,14 +593,30 @@ export function createViewer(canvas, manifest, base) {
   const viewer = {
     gl, manifest: M, draw, atlas,
     cx: M.w / 2, cy: M.h / 2, zoom: 0.2, // zoom: CSS pixels per image pixel
-    cssW: 1, cssH: 1, dpr: 1, minZoom: 0.05, maxZoom: D > 1 ? Math.max(D * 1.25, BASE_D * 2) : 10, detail: D, base: BASE_D,
+    cssW: 1, cssH: 1, dpr: 1, minZoom: 0.05, maxZoom: 10, detail: D, base: BASE_D,
+    styles: Object.keys(STYLES), style: Object.keys(STYLES)[0],
+    // Show the picture in another of its styles. Everything drawn over it stays as it is.
+    setStyle(name) {
+      if (!STYLES[name]) return;
+      era++;
+      for (const t of tiles.values()) if (t.tex) gl.deleteTexture(t.tex);
+      tiles.clear();
+      queue.length = 0;
+      usePyramid(name);
+      viewer.style = name;
+      viewer.detail = D;
+      viewer.base = BASE_D;
+      viewer.setPixel(viewer.pixel);
+      viewer.prime();
+      viewer.dirty = true;
+    },
     // The pixel look: 0 shows the picture one painted pixel to the screen pixel (smooth); 2 shows it in hard
     // pixels at least two screen pixels across, like the sprites drawn over it. texel is the size of one
     // displayed pixel of the picture, in map pixels.
     pixel: 0, texel: 1 / D,
     setPixel(n) {
       viewer.pixel = n > 1 ? n : 0;
-      viewer.maxZoom = D > 1 ? Math.max(D * 1.25 * (viewer.pixel || 1), BASE_D * 2) : 10;
+      viewer.maxZoom = NATIVE ? D * 2.5 : D > 1 ? Math.max(D * 1.25 * (viewer.pixel || 1), BASE_D * 2) : 10;
     },
     // How far in it is worth going at a point: the land is painted finely enough to go all the way
     // (in the towns that is a little past one screen pixel to the painted pixel, in open country about
@@ -597,6 +624,8 @@ export function createViewer(canvas, manifest, base) {
     zoomLimit(x, y) {
       if (D <= 1) return 10;
       const d = D / 2 ** finestAt(x, y);
+      // Drawn pixels stay crisp when enlarged, so a native level may be shown a few times its size.
+      if (NATIVE) return d > BASE_D ? d * 2.5 : d * 4;
       return d > BASE_D ? Math.min(D * 1.25, d * 2.5) * (viewer.pixel || 1) : d * 2.5;
     },
     bloom: 1, contrast: 1, tilt: 1, poster: 14,
@@ -700,7 +729,7 @@ export function createViewer(canvas, manifest, base) {
       gl.uniform4f(progTile.u.uGeo, M.px, M.oy, M.kz, M.sea.res);
       gl.uniform2f(progTile.u.uSeaSize, M.sea.w, M.sea.h);
       gl.uniform1f(progTile.u.uTime, time);
-      gl.uniform1f(progTile.u.uDetail, BASE_D);
+      gl.uniform1f(progTile.u.uDetail, BASE_D); // (set again below once the level is known, for a native style)
       gl.uniform1f(progTile.u.uFx, seaReady ? Math.max(0, Math.min(1, (zd - 0.16) / 0.2)) : 0);
       gl.uniform1i(progTile.u.uTex, 0);
       gl.uniform1i(progTile.u.uSea, 1);
@@ -712,6 +741,7 @@ export function createViewer(canvas, manifest, base) {
       const grain = viewer.pixel > 1 ? viewer.pixel : 1;
       const L = Math.max(0, Math.min(maxLevel, Math.ceil(Math.log2((D * grain) / zd) - 0.001)));
       viewer.texel = 2 ** L / D;
+      if (NATIVE) gl.uniform1f(progTile.u.uDetail, Math.min(D / 2 ** L, Math.max(1, zd))); // the sea moves in pixels the size of the picture's
       const [bx0, by0, bx1, by1] = viewer.bounds();
       const unit = 2 ** L / D; // map pixels per tile pixel at this level
       const span = TS * unit;

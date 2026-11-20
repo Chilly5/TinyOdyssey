@@ -189,6 +189,7 @@
 
   <nav id="tools" aria-label="Map tools">
     <button class="btn go" id="btnVoyage" type="button" aria-label="Sail the Odyssey">Sail<span>&nbsp;the Odyssey</span></button>
+    <button class="btn" id="btnStyle" type="button" title="The style the picture is drawn in" aria-label="Picture style"><b aria-hidden="true">&#9638;</b><span>Pixel art</span></button>
     <button class="btn" id="btnTime" type="button" title="Day and night come and go"><b aria-hidden="true">&#9680;</b><span>Day &amp; night</span></button>
     <button class="btn" id="btnSound" type="button" aria-pressed="false" title="Sound is off" aria-label="Sound"><b aria-hidden="true">&#9834;</b><span>Sound</span></button>
     <button class="btn" id="btnAtlas" type="button" aria-pressed="false" title="Atlas of places"><b aria-hidden="true">&#9776;</b><span>Atlas</span></button>
@@ -225,15 +226,16 @@
         <button class="btn icon" type="button" data-close aria-label="Close">&times;</button>
       </header>
       <div class="body">
-        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data. A 3D model of the whole scene, with every tree, town, road and temple in place, was rendered through one fixed camera. An image model then redrew that render as voxel art, window by window, into a single picture of 880 million pixels, painted all the land again at twice that scale, and the towns and landmarks at four times. What you are zooming into is that picture; smaller stories show their names as you get close. The sea, the ships, the monsters and the people going about their day are drawn live on top, and step behind the houses as they pass. A day lasts five minutes: at dusk the lamps come on and most people go indoors.</p>
+        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data. The whole scene is a 3D model made of small cubes, with every tree, town, road and temple in place, seen through one fixed camera. Each step of the zoom is its own picture of that model at a finer grain, so going closer does not enlarge anything: a house gains its door, then its shutters and the tiles of its roof. The sea, the ships, the monsters and the people going about their day are drawn live on top, and step behind the houses as they pass. A day lasts five minutes: at dusk the lamps come on and most people go indoors.</p>
+        <p>The picture comes in three styles: pixel art, clean stacked terraces, and an earlier version that an image model painted from the same scene.</p>
         <p>Where the ancient world argued about a location, which is most of the Odyssey, the map follows the tradition repeated most often and says so.</p>
         <dl>
           <dt>Terrain</dt><dd>SRTM, GMTED and ETOPO1 through Mapzen terrain tiles</dd>
           <dt>Scale</dt><dd>1 pixel of the open country is about 40 m; heights are stretched roughly seven times; towns and landmarks are toy-sized on purpose</dd>
-          <dt>Painted by</dt><dd>FLUX.2 klein, an open image model. It redrew every tree and temple, so treat details as illustration.</dd>
+          <dt>Painted style</dt><dd>Redrawn by FLUX.2 klein, an open image model, so treat its details as illustration.</dd>
           <dt>People, ships and monsters</dt><dd>About 45 small voxel models and the landmarks' own moving parts, built and rendered in Blender</dd>
           <dt>Sound</dt><dd>Made in the browser from noise and a few sine waves: sea, wind, birds, crickets, a lyre where the Muses are. Off until you turn it on.</dd>
-          <dt>Keys</dt><dd>Arrows or WASD move, + and &minus; zoom, N changes the time of day, M the sound, P the pixel look</dd>
+          <dt>Keys</dt><dd>Arrows or WASD move, + and &minus; zoom, V changes the style, N the time of day, M the sound</dd>
           <dt>Inspired by</dt><dd><a href="https://hexagonal.earth/" target="_blank" rel="noopener">hexagonal.earth</a> and the isometric city maps of <a href="https://isometric.nyc" target="_blank" rel="noopener">New York</a>, <a href="https://tiny.london" target="_blank" rel="noopener">London</a>, <a href="https://www.yadongxie.com/lab/singapore" target="_blank" rel="noopener">Singapore</a> and <a href="https://isometricsf.com" target="_blank" rel="noopener">San Francisco</a></dd>
         </dl>
       </div>

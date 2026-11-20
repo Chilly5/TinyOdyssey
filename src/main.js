@@ -29,7 +29,14 @@ async function boot() {
   // ?look=pixel shows the map in hard pixels like the sprites over it, ?look=smooth as it was painted.
   // The world can name its own (manifest.look). P switches between the two.
   const look = new URLSearchParams(location.search).get('look') || M.look || 'smooth';
-  viewer.setPixel(look === 'pixel' ? 2 : 0);
+  // ?style=pixel|voxel|painted picks which of the world's pictures to show; the button and V change it.
+  const STYLE_NAMES = { pixel: 'Pixel art', voxel: 'Terraces', painted: 'Painted' };
+  let remembered = null;
+  try { remembered = localStorage.getItem('tiny.style'); } catch { /* private windows may refuse */ }
+  const wantStyle = new URLSearchParams(location.search).get('style') || remembered;
+  if (wantStyle && viewer.styles.includes(wantStyle) && wantStyle !== viewer.style) viewer.setStyle(wantStyle);
+  else viewer.setPixel(0);
+  if (look === 'pixel') viewer.setPixel(2);
   viewer.resize();
   const [sheet] = await Promise.all([viewer.loadBitmap(`${BASE}${M.sprites.file}?v=${M.version}`, true), viewer.prime()]);
   const atlas = buildAtlas(sheet, M.sprites.frames);
@@ -166,6 +173,24 @@ async function boot() {
     btnTime.firstElementChild.textContent = mode === 'day' ? '\u2600' : mode === 'night' ? '\u263E' : '\u25D0';
     btnTime.title = mode === 'day' ? 'Always day' : mode === 'night' ? 'Always night' : 'Day and night come and go';
     btnTime.lastElementChild.textContent = mode === 'day' ? 'Day' : mode === 'night' ? 'Night' : 'Day & night';
+  }
+  const btnStyle = $('btnStyle');
+  const nameStyle = (name) => {
+    if (!btnStyle) return;
+    btnStyle.lastElementChild.textContent = STYLE_NAMES[name] || name;
+    btnStyle.title = 'The picture is drawn as: ' + (STYLE_NAMES[name] || name) + '. Click for the next style.';
+  };
+  function setStyle(name) {
+    if (name !== viewer.style) viewer.setStyle(name);
+    goal.zoom = Math.min(goal.zoom, viewer.maxZoom);
+    try { localStorage.setItem('tiny.style', name); } catch { /* fine */ }
+    nameStyle(name);
+  }
+  const nextStyle = () => setStyle(viewer.styles[(viewer.styles.indexOf(viewer.style) + 1) % viewer.styles.length]);
+  if (btnStyle) {
+    if (viewer.styles.length < 2) btnStyle.hidden = true;
+    btnStyle.addEventListener('click', nextStyle);
+    nameStyle(viewer.style);
   }
   btnSound?.addEventListener('click', () => setSound(!sound.on));
   btnTime?.addEventListener('click', () => setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]));
@@ -474,6 +499,7 @@ async function boot() {
       else if (voyaging) leaveVoyage();
     } else if (voyaging && e.key === 'ArrowRight') showStop(voyage.stop + 1);
     else if (voyaging && e.key === 'ArrowLeft') showStop(voyage.stop - 1);
+    else if (e.key === 'v' || e.key === 'V') nextStyle();
     else if (e.key === 'm' || e.key === 'M') setSound(!sound.on);
     else if (e.key === 'n' || e.key === 'N') setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]);
     else if (e.key === 'p' || e.key === 'P') {
@@ -584,5 +610,5 @@ async function boot() {
   }
   requestAnimationFrame(frame);
 
-  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound, follow, actors, get following() { return following; } };
+  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound, setStyle, follow, actors, get following() { return following; } };
 }

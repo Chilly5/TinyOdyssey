@@ -15,11 +15,16 @@ export function buildPlan({ fields, sites, landmarks, S, GW, GD, ground, lap = (
   const streets = []; // paved ways inside towns, as polylines of cells
   const roads = []; // tracks between places, as polylines of cells
   const towns = [];
+  // The same things as shapes, for drawing them again at a finer scale (gen/fine.mjs): each is
+  // { pts, wide, bit } (a polyline so many cells across), or { box: [x0, z0, x1, z1], bit } (a tower),
+  // or { oval: [cx, cz, rx, rz], bit } (a market place).
+  const shapes = [];
   const inWorld = (x, z) => x >= 0 && z >= 0 && x < GW && z < GD;
   const isLand = (x, z) => inWorld(x, z) && fields.elevAt((x + 0.5) / S, (z + 0.5) / S) > 0;
 
   // Paint a polyline `wide` cells across into the flags, wherever test allows.
   const stroke = (pts, wide, bit, test) => {
+    shapes.push({ pts: pts.map(([x, z]) => [x, z]), wide, bit });
     const r = wide / 2;
     for (let i = 0; i < pts.length - 1; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
@@ -123,6 +128,7 @@ export function buildPlan({ fields, sites, landmarks, S, GW, GD, ground, lap = (
     const px = Math.round(cx + Math.cos(pa) * ringR), pz = Math.round(cz + Math.sin(pa) * ringR);
     const market = best > -2 && R >= 40;
     if (market) {
+      shapes.push({ oval: [px + 0.5, pz + 0.5, 12.3, 8.3], bit: PF.PAVED });
       for (let b = -8; b <= 8; b++) for (let a = -12; a <= 12; a++) {
         if ((a / 12) ** 2 + (b / 8) ** 2 <= 1 && open(px + a, pz + b)) flag[(pz + b) * GW + px + a] |= PF.PAVED;
       }
@@ -143,22 +149,25 @@ export function buildPlan({ fields, sites, landmarks, S, GW, GD, ground, lap = (
       const rw = R - 8;
       const nT = Math.max(6, Math.round((TAU * rw) / 30));
       const n = Math.ceil(TAU * rw * 2);
+      let run = null; // the stretch of wall being laid, between one gate or gap and the next
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
         const x = Math.round(cx + Math.cos(a) * rwAt(a)), z = Math.round(cz + Math.sin(a) * rwAt(a));
-        if (!isLand(x, z) || (inBox(x, z) && solid[at(x, z)])) continue;
-        let gate = false;
+        let gate = !isLand(x, z) || (inBox(x, z) && solid[at(x, z)]);
         for (const sa of spokes) {
           const da = Math.abs(((a - sa + TAU * 1.5) % TAU) - Math.PI);
           if (da * rw < 3.2) gate = true;
         }
-        if (gate) continue;
+        if (gate) { run = null; continue; }
+        if (!run) shapes.push({ pts: run = [], wide: 2, bit: PF.WALL });
+        run.push([cx + Math.cos(a) * rwAt(a) + 1, cz + Math.sin(a) * rwAt(a) + 1]);
         for (let b = 0; b <= 1; b++) for (let c = 0; c <= 1; c++) if (isLand(x + c, z + b)) flag[(z + b) * GW + x + c] |= PF.WALL;
       }
       for (let i = 0; i < nT; i++) {
         const a = a0 + ((i + 0.5) / nT) * TAU;
         const x = Math.round(cx + Math.cos(a) * rwAt(a)), z = Math.round(cz + Math.sin(a) * rwAt(a));
         if (!isLand(x, z) || (inBox(x, z) && solid[at(x, z)])) continue;
+        shapes.push({ box: [x - 2, z - 2, x + 3, z + 3], bit: PF.WALL | PF.TOWER });
         for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++) if (isLand(x + c, z + b)) flag[(z + b) * GW + x + c] |= PF.WALL | PF.TOWER;
       }
     }
@@ -380,5 +389,30 @@ export function buildPlan({ fields, sites, landmarks, S, GW, GD, ground, lap = (
     return out;
   };
 
-  return { flag, objects, objectsIn, streets, roads, towns };
+  // Shapes by 128-cell square.
+  const shapeAt = new Map();
+  for (const sh of shapes) {
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    if (sh.pts) {
+      if (sh.pts.length < 2) continue;
+      for (const [x, z] of sh.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      x0 -= sh.wide; z0 -= sh.wide; x1 += sh.wide; z1 += sh.wide;
+    } else if (sh.box) [x0, z0, x1, z1] = sh.box;
+    else { x0 = sh.oval[0] - sh.oval[2]; x1 = sh.oval[0] + sh.oval[2]; z0 = sh.oval[1] - sh.oval[3]; z1 = sh.oval[1] + sh.oval[3]; }
+    sh.bb = [x0, z0, x1, z1];
+    for (let bj = Math.floor(z0) >> 7; bj <= Math.floor(z1) >> 7; bj++) for (let bi = Math.floor(x0) >> 7; bi <= Math.floor(x1) >> 7; bi++) {
+      const key = bj * 4096 + bi;
+      if (!shapeAt.has(key)) shapeAt.set(key, []);
+      shapeAt.get(key).push(sh);
+    }
+  }
+  const shapesIn = (x0, z0, x1, z1) => {
+    const out = new Set();
+    for (let bj = Math.max(0, Math.floor(z0) >> 7); bj <= Math.floor(z1) >> 7; bj++) for (let bi = Math.max(0, Math.floor(x0) >> 7); bi <= Math.floor(x1) >> 7; bi++) {
+      for (const sh of shapeAt.get(bj * 4096 + bi) || []) if (sh.bb[2] >= x0 && sh.bb[0] <= x1 && sh.bb[3] >= z0 && sh.bb[1] <= z1) out.add(sh);
+    }
+    return [...out];
+  };
+
+  return { flag, objects, objectsIn, streets, roads, towns, shapesIn };
 }
