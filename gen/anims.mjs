@@ -14,6 +14,11 @@
 // exactly as before, and left out.
 //
 //   node gen/build.mjs --anims     ->  units/anims/src/<site>.json, one per animated landmark
+//                                      units/anims/src/events.json, what happens at which frame
+//
+// events.json is not for Blender. It lists, for each landmark, the splashes its model asks for (the
+// Cyclops's rock hitting the sea, the Clashing Rocks meeting) as [frame, x, y, size] in map pixels;
+// gen/tiles.mjs puts them in the manifest and the viewer makes the splash when the frame comes round.
 //
 // A file holds: id, fps, n (frames), q (cubes to the map pixel, each way), box (the
 // rectangle of the picture the animation ever touches, map pixels), pal (the colours
@@ -36,15 +41,18 @@ export function exportAnims({ renderer, landmarks, rebake, q, dir, lap = () => {
   fs.mkdirSync(dir, { recursive: true });
   const OY = renderer.OY;
   let files = 0, bytes = 0;
+  const events = {};
   for (const lm of landmarks) {
     if (!lm.anim || UNIT_PLAYED.includes(lm.site.id)) continue;
     const big = rebake(lm.site);
     const n = Math.max(1, Math.round(lm.anim.period * lm.anim.fps));
     const poses = [];
     let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    big.takeSplashes();
     for (let f = 0; f < n; f++) {
       const sp = big.pose(big.t0 + f / lm.anim.fps);
       poses.push(sp);
+      for (const [x, y, size] of big.takeSplashes()) (events[lm.site.id] ||= []).push([f, Math.round(x / q), Math.round(y / q), Math.round(size * 8)]);
       for (let i = 0; i < sp.n; i++) {
         if (sp.x[i] < x0) x0 = sp.x[i];
         if (sp.x[i] > x1) x1 = sp.x[i];
@@ -103,5 +111,6 @@ export function exportAnims({ renderer, landmarks, rebake, q, dir, lap = () => {
     bytes += fs.statSync(file).size;
     lap(`  ${lm.site.id}: ${n} frames (${seen.size} distinct), about ${Math.round(shown.reduce((a, k) => a + k.length, 0) / n)} cubes each, box ${ix1 - ix0} x ${iy1 - iy0}`);
   }
-  lap(`animation: ${files} landmarks written to ${dir}, ${(bytes / 1e6).toFixed(1)} MB`);
+  fs.writeFileSync(path.join(dir, 'events.json'), JSON.stringify(events));
+  lap(`animation: ${files} landmarks written to ${dir}, ${(bytes / 1e6).toFixed(1)} MB; splashes at ${Object.keys(events).join(', ') || 'none'}`);
 }

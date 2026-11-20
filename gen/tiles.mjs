@@ -213,6 +213,10 @@ export function buildOverlays({ renderer, fields, sites, stamps, landmarks, S, r
       fs.writeFileSync(path.join(out, pg.file), png);
       bytes += png.length;
     }
+    // What happens at which frame (splashes) comes straight from the exporter, not through Blender.
+    const evFile = path.join(animDir, '..', 'src', 'events.json');
+    const ev = fs.existsSync(evFile) ? JSON.parse(fs.readFileSync(evFile, 'utf8')) : {};
+    for (const an of a.anims) if (ev[an.id]) an.events = ev[an.id];
     flip = { anims: a.anims, pages: a.pages };
     lap(`animation: ${a.anims.length} landmarks from Blender on ${a.pages.length} sheets, ${(bytes / 1e6).toFixed(1)} MB`);
   } else {

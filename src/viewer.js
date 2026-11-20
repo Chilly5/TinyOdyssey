@@ -558,14 +558,17 @@ export function createViewer(canvas, manifest, base) {
       // In the pixel look a unit moves in steps of the map's own pixels, so the two grids stay in register.
       const g = viewer.pixel > 1 ? Math.min(0.5, Math.max(viewer.texel, s)) : 1 / D;
       const x0 = Math.round(x / g) * g - rec[5] * s, y0 = Math.round(y / g) * g - rec[6] * s;
-      pushQuad(x0, y0, x0 + rec[3] * s, y0 + rec[4] * s, rec[1], rec[2], rec[1] + rec[3], rec[2] + rec[4], alpha >= 1 ? WHITE : packCol(alpha, alpha, alpha, alpha), z);
+      // The thing has length as well as height: the part of it drawn below its anchor (a ship's bow, an ox's
+      // head) stands that much nearer the camera, and must not be hidden by the level water or ground it is on.
+      const near = z < 0 ? z : z + (Math.max(0, rec[4] - rec[6]) * s) / M.kz;
+      pushQuad(x0, y0, x0 + rec[3] * s, y0 + rec[4] * s, rec[1], rec[2], rec[1] + rec[3], rec[2] + rec[4], alpha >= 1 ? WHITE : packCol(alpha, alpha, alpha, alpha), near);
       return true;
     },
     // A soft dark oval on the ground under something.
     blob(x, y, rx, ry, a = 0.25, z = -1) {
       const f = atlas.frames.disc_9;
       if (!f || !draw.use(0)) return;
-      pushQuad(x - rx, y - ry, x + rx, y + ry, f[0], f[1], f[0] + f[2], f[1] + f[3], packCol(0.05 * a, 0.04 * a, 0.14 * a, a), z);
+      pushQuad(x - rx, y - ry, x + rx, y + ry, f[0], f[1], f[0] + f[2], f[1] + f[3], packCol(0.05 * a, 0.04 * a, 0.14 * a, a), z < 0 ? z : z + ry / M.kz);
     },
     // A flat rectangle of image pixels. Colour components 0..1. grid: how many steps to the map pixel it may sit on.
     rect(x, y, w, h, r, g, b, a = 1, grid = 1) {

@@ -186,6 +186,23 @@ export function createSound() {
       for (const v of buf) { sum += v * v; peak = Math.max(peak, Math.abs(v)); }
       return [Math.sqrt(sum / buf.length), peak];
     },
+    // Something heavy landing in the sea, in sight. strength 0..1.
+    splash(strength = 1) {
+      if (!on) return;
+      const t0 = ctx.currentTime + 0.02;
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = white;
+      f.type = 'bandpass';
+      f.frequency.setValueAtTime(900, t0);
+      f.frequency.exponentialRampToValueAtTime(2600, t0 + 0.5);
+      f.Q.value = 0.8;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.35 * strength, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+      s.connect(f).connect(g).connect(master);
+      s.start(t0, Math.random() * 2);
+      s.stop(t0 + 1);
+    },
     // Thunder, when lightning strikes in sight. strength 0..1.
     thunder(strength = 1) {
       if (!on) return;

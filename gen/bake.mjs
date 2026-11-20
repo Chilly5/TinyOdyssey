@@ -157,6 +157,7 @@ export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap =
     const ticks = [];
     const dynamic = []; // { mesh, glow }
     const fxList = [];
+    const splashes = []; // [image x, image y, size] since they were last taken
     const fx = {
       time: T0,
       rgb,
@@ -174,7 +175,9 @@ export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap =
       },
       glyphs: (parent, o) => { fxList.push({ t: 'glyph', parent, o }); return { on: true }; },
       lightning: (parent, o = {}) => { fxList.push({ t: 'bolt', parent, o: { ...o, y: 3.4 } }); return () => {}; },
-      splash: () => {},
+      // A splash on the sea at (x, z) in model units: kept with the moment it happens, for the animation (gen/anims.mjs).
+      // (At the height of the model's own ground, which is where its moving parts come down.)
+      splash: (x, z, size = 1) => { splashes.push([bx + x * modelPx, renderer.OY + KZ * (bz + z * modelPx) - KY * by, size]); },
       ring: (parent, o) => { fxList.push({ t: 'ring', parent, o }); },
     };
     const treeList = [];
@@ -289,6 +292,8 @@ export function bakeLandmarks({ sites, fields, renderer, stamps, modelPx, snap =
         group.updateMatrixWorld(true);
         return poseSplats();
       },
+      // The splashes asked for since the last call (by the ticks that pose() runs).
+      takeSplashes() { return splashes.splice(0); },
       anim, t0: T0,
       splatInto,
     });

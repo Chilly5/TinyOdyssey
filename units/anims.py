@@ -171,7 +171,7 @@ def main():
     sheet = B.arg("--sheet")
     sc, cam = B.setup()
     tmp = tempfile.mkdtemp(prefix="anims_")
-    files = sorted(glob.glob(os.path.join(SRC, "*.json")))
+    files = sorted(f for f in glob.glob(os.path.join(SRC, "*.json")) if os.path.basename(f) != "events.json")
     if only:
         files = [f for f in files if os.path.splitext(os.path.basename(f))[0] in only.split(",")]
 

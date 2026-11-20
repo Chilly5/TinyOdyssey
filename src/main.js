@@ -145,6 +145,10 @@ async function boot() {
     heard.notes = notes;
     sound.update(dt, heard);
   }
+  actors.onSplash = (x, y, size) => {
+    const b = viewer.bounds();
+    if (size >= 10 && x > b[0] && x < b[2] && y > b[1] && y < b[3]) sound.splash(0.3 + 0.7 * smooth(0.3, 3, viewer.zoom));
+  };
   actors.onBolt = (e) => {
     const b = viewer.bounds();
     if (e.x > b[0] - 200 && e.x < b[2] + 200 && e.y > b[1] - 200 && e.y < b[3] + 300) sound.thunder(0.35 + 0.65 * smooth(0.2, 2, viewer.zoom));
@@ -270,6 +274,7 @@ async function boot() {
       actions.append(b);
     }
     actions.hidden = !actions.childElementCount;
+    unfollow();
     openSheet('card');
     selected = id;
     labels.select(id);
@@ -283,11 +288,21 @@ async function boot() {
     }
   }
 
-  // Follow one of the roaming names (a ship, Pegasus) for a moment.
+  // Follow something that moves (a ship, Pegasus, Heracles): the map stays on it, zooming included,
+  // until the visitor drags the map, steers with the keys, picks a place or presses Escape.
   let following = null;
-  function follow(id) {
-    following = roaming[id] ? { item: roaming[id], until: clock + 16 } : null;
-    if (following) goal.zoom = clamp(Math.max(goal.zoom, 1.6), viewer.minZoom, viewer.maxZoom);
+  function follow(id, thing) {
+    const item = roaming[id] || thing;
+    if (!item) return;
+    if (!side.hidden) openSheet(null);
+    following = { item, id: roaming[id] ? id : null };
+    labels.select(following.id); // its name stays up however far out the view is
+    goal.zoom = clamp(Math.max(goal.zoom, 1.6), viewer.minZoom, viewer.maxZoom);
+  }
+  function unfollow() {
+    if (!following) return;
+    following = null;
+    labels.select(selected);
   }
 
   // ----------------------------------------------------------------- voyage --
@@ -322,7 +337,7 @@ async function boot() {
     document.body.classList.add('voyaging');
     vEl.hidden = false;
     openSheet(null);
-    following = null;
+    unfollow();
     voyage.goTo(i, true);
     showStop(i);
     setHash('odyssey');
@@ -356,11 +371,11 @@ async function boot() {
     let want = goal.zoom * k;
     if (k > 1) want = Math.min(want, Math.max(goal.zoom, limitNear(ix, iy, want))); // stop where the picture runs out of detail
     const next = clamp(want, viewer.minZoom, viewer.maxZoom);
-    goal.x = clamp(ix - (sx - viewer.cssW / 2) / next, 0, M.w);
-    goal.y = clamp(iy - (sy - viewer.cssH / 2) / next, 0, M.h);
     goal.zoom = next;
     goal.rate = rate;
-    following = null;
+    if (following) return; // zooming in on what is being followed: the map stays on it
+    goal.x = clamp(ix - (sx - viewer.cssW / 2) / next, 0, M.w);
+    goal.y = clamp(iy - (sy - viewer.cssH / 2) / next, 0, M.h);
   }
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
@@ -381,7 +396,7 @@ async function boot() {
     if (pointers.size === 1) {
       if (press && press.moved < 4) return;
       canvas.classList.add('dragging');
-      following = null;
+      unfollow();
       // Dragging moves the image exactly with the finger, so skip the easing.
       viewer.cx = goal.x = clamp(goal.x - dx / viewer.zoom, 0, M.w);
       viewer.cy = goal.y = clamp(goal.y - dy / viewer.zoom, 0, M.h);
@@ -408,9 +423,21 @@ async function boot() {
     zoomBy(2, e.clientX - rect.left, e.clientY - rect.top, 6);
   });
 
-  // A tap on the map picks the landmark under it, or clears the selection.
+  // A tap on the map picks the ship (or the named wanderer) under it to follow, else the landmark
+  // under it, else clears the selection.
   function tap(x, y) {
     const rect = canvas.getBoundingClientRect();
+    if (viewer.zoom > 0.3) {
+      let pick = null, pd = 26;
+      const near = (thing, id, lift) => {
+        viewer.toScreen(thing.target.x, thing.target.y, at);
+        const d = Math.hypot(at.x - (x - rect.left), at.y - lift * Math.min(viewer.zoom, 6) - (y - rect.top));
+        if (d < pd) { pd = d; pick = [id, thing]; }
+      };
+      for (const sh of actors.ships) near(sh, sh.id, 3);
+      for (const id of Object.keys(roaming)) near(roaming[id], id, 2);
+      if (pick) { follow(pick[0], pick[1]); return; }
+    }
     let best = null, bd = Infinity;
     for (const q of M.sites) {
       const site = siteById[q.id];
@@ -424,15 +451,18 @@ async function boot() {
     else if (!sheets.card.hidden) openSheet(null);
   }
 
-  canvas.addEventListener('wheel', (e) => {
+  const wheel = (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
     zoomBy(Math.exp(-clamp(dy, -240, 240) * 0.0022), e.clientX - rect.left, e.clientY - rect.top);
-  }, { passive: false });
+  };
+  canvas.addEventListener('wheel', wheel, { passive: false });
+  // The names lie over the map, and the one being followed sits right under the cursor.
+  $('labels').addEventListener('wheel', wheel, { passive: false });
   $('zoomIn').addEventListener('click', () => zoomBy(1.6));
   $('zoomOut').addEventListener('click', () => zoomBy(1 / 1.6));
-  $('zoomFit')?.addEventListener('click', () => flyTo(M.w / 2, M.h / 2, viewer.minZoom, 3));
+  $('zoomFit')?.addEventListener('click', () => { unfollow(); flyTo(M.w / 2, M.h / 2, viewer.minZoom, 3); });
 
   const held = new Set();
   window.addEventListener('keydown', (e) => {
@@ -440,6 +470,7 @@ async function boot() {
     const voyaging = document.body.classList.contains('voyaging');
     if (e.key === 'Escape') {
       if (!side.hidden) openSheet(null);
+      else if (following) unfollow();
       else if (voyaging) leaveVoyage();
     } else if (voyaging && e.key === 'ArrowRight') showStop(voyage.stop + 1);
     else if (voyaging && e.key === 'ArrowLeft') showStop(voyage.stop - 1);
@@ -495,7 +526,7 @@ async function boot() {
       goal.x = clamp(goal.x, 0, M.w);
       goal.y = clamp(goal.y, 0, M.h);
       goal.rate = 10;
-      following = null;
+      unfollow();
     }
 
     actors.update(clock, dt);
@@ -514,9 +545,15 @@ async function boot() {
       const cover = side.hidden || !narrow.matches ? vEl.offsetHeight : side.offsetHeight;
       flyTo(tx, ty + liftFor(cover, zoom), zoom, arrived ? 2.2 : 3.5);
     } else if (following) {
-      const t = following.item.target;
+      // Keep pace with it exactly (easing alone trails behind, further the closer the view), and ease
+      // away only whatever distance is left. A jump (a voyage starting again) is flown, not snapped.
+      const t = following.item.target, was = following.was;
+      if (was && Math.hypot(t.x - was.x, t.y - was.y) < 40) {
+        viewer.cx += t.x - was.x;
+        viewer.cy += t.y - was.y;
+      }
+      following.was = { x: t.x, y: t.y };
       flyTo(t.x, t.y, goal.zoom, 4);
-      if (clock > following.until) following = null;
     }
 
     // Open country has less to show than a town, so it stops zooming sooner.
@@ -547,5 +584,5 @@ async function boot() {
   }
   requestAnimationFrame(frame);
 
-  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound };
+  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound, follow, actors, get following() { return following; } };
 }

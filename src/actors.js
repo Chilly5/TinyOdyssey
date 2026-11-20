@@ -153,6 +153,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
   const splash = (x, y, size = 9) => {
     const r = rings[nextRing++ % rings.length];
     r.t0 = now; r.x = x; r.y = y; r.size = size;
+    if (api.onSplash) api.onSplash(x, y, size);
   };
   layers[0].push((d) => {
     for (const r of rings) {
@@ -160,11 +161,19 @@ export function createActors(viewer, M, calm, base = 'world/') {
       if (u < 0 || u >= 1) continue;
       const rr = clamp(Math.round((r.size * (0.3 + u * 0.9)) / 2) * 2 + 1, 3, 15);
       d.sprite(`ring_${rr}`, r.x, r.y, { alpha: 1 - u * 0.7 });
+      if (r.size < 10 || u > 0.8) continue;
+      // Something heavy went in: a column of spray goes up and falls back.
+      const v = u / 0.8;
+      for (let i = 0; i < 9; i++) {
+        const a = i * 2.4 + r.x, out = Math.cos(a) * r.size * (0.15 + 0.5 * v), up = (0.6 + 0.4 * Math.sin(i * 1.7)) * r.size * 1.5 * Math.sin(Math.PI * Math.min(1, v * 1.1));
+        d.sprite(i % 3 ? 'disc_1' : 'disc_2', r.x + out, r.y - up + Math.sin(a) * 1.5, { alpha: 1 - v * v });
+      }
     }
   });
 
   // --- Ships ---------------------------------------------------------------------
   const p = {};
+  const ships = []; // every one of them, for the visitor to pick and follow: { id (if it has a name), target }
   function makeShip(kind, label) {
     const ship = { kind, x: 0, y: 0, k: 0, moving: false, wake: [], last: null, target: { x: 0, y: 0 }, ph: rnd() * 6 };
     ship.place = (path, dist, moving, dir = 1) => {
@@ -197,6 +206,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
       if (!unit(d, SHIP_UNIT[kind], ship.k, oars, ship.x, ship.y + bob, viewer.depthOf(ship.y))) d.sprite(`${kind}_${ship.k}`, ship.x, ship.y + bob);
     });
     if (label) roaming.push({ id: label.id, name: label.name, kind: 'ship', tier: label.tier, target: ship.target, dy: 10 });
+    ships.push({ id: label ? label.id : null, target: ship.target });
     return ship;
   }
 
@@ -381,7 +391,12 @@ export function createActors(viewer, M, calm, base = 'world/') {
         // Until the size wanted has arrived, draw whichever size is here.
         let use = set;
         if (pages[set.page].state !== 2) use = a.sets.find((t) => t.loaded && pages[t.page].state === 2) || set;
-        const fr = use.frames[calm ? 0 : Math.floor(now * a.fps) % a.n], sp = use.sprites, k = 1 / use.q;
+        const fi = calm ? 0 : Math.floor(now * a.fps) % a.n;
+        if (a.events && fi !== a.at) { // a rock has landed, the rocks have met
+          if (a.at != null) for (const e of a.events) if ((e[0] - a.at - 1 + a.n) % a.n < (fi - a.at + a.n) % a.n) splash(e[1], e[2], e[3]);
+          a.at = fi;
+        }
+        const fr = use.frames[fi], sp = use.sprites, k = 1 / use.q;
         for (let i = 0; i < fr.length; i += 3) {
           const r = sp[fr[i]];
           if (d.use(pages[use.page + r[0]].at)) d.blit(a.box[0] + fr[i + 1] * k, a.box[1] + fr[i + 2] * k, r[1], r[2], r[3], r[4], k);
@@ -631,8 +646,9 @@ export function createActors(viewer, M, calm, base = 'world/') {
   });
 
   const api = {
-    voyage, roaming, splash,
+    voyage, roaming, splash, ships,
     onBolt: null, // called with the effect when lightning strikes (for the thunder)
+    onSplash: null, // called with x, y and size whenever something hits the water
     setLife(l) { life = l; },
     update(t, dt) {
       now = t;
