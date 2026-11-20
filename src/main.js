@@ -115,6 +115,7 @@ async function boot() {
     music: new URL('./audio/theme.mp3', import.meta.url).href,
     town: new URL('./audio/market.mp3', import.meta.url).href, // a crowd's murmur, from an old film-studio library
     market: new URL('./audio/village.mp3', import.meta.url).href, // a village market, close to
+    wind: new URL('./audio/wind.mp3', import.meta.url).href, // a light wind over open desert
   });
   let seaField = null; // the builder's map of how far the shore is, read once the sound is first turned on
   function hearSea() {
@@ -163,13 +164,18 @@ async function boot() {
     heard.crowd = people ? Math.min(1, people.crowd / 12) : heard.town;
     sound.update(dt, heard);
   }
+  // A splash and a clap of thunder are sounds of the place they happen in: heard when the view has come
+  // down to it, and not at all from high up. (Over the whole map every storm is in sight at once, and their
+  // thunder, a low rumble every couple of seconds, was a surf that never stopped.)
   actors.onSplash = (x, y, size) => {
-    const b = viewer.bounds();
-    if (size >= 10 && x > b[0] && x < b[2] && y > b[1] && y < b[3]) sound.splash(0.3 + 0.7 * smooth(0.3, 3, viewer.zoom));
+    const b = viewer.bounds(), near = smooth(1.5, 6, viewer.zoom);
+    if (near > 0.05 && size >= 10 && x > b[0] && x < b[2] && y > b[1] && y < b[3]) sound.splash(near);
   };
+  let thundered = -1e9;
   actors.onBolt = (e) => {
-    const b = viewer.bounds();
-    if (e.x > b[0] - 200 && e.x < b[2] + 200 && e.y > b[1] - 200 && e.y < b[3] + 300) sound.thunder(0.35 + 0.65 * smooth(0.2, 2, viewer.zoom));
+    const b = viewer.bounds(), near = smooth(1.2, 5, viewer.zoom), t = performance.now();
+    if (near < 0.05 || t - thundered < 6000) return; // not every flash: a roll of thunder lasts
+    if (e.x > b[0] - 200 && e.x < b[2] + 200 && e.y > b[1] - 200 && e.y < b[3] + 300) { thundered = t; sound.thunder(near); }
   };
   const btnSound = $('btnSound'), btnTime = $('btnTime');
   const showSound = () => {

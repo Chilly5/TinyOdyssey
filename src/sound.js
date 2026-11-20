@@ -15,14 +15,15 @@
 
 const MUSIC = 0.5; // the song at its fullest
 const EFFECTS = 0.6; // everything else, against it
+const WIND = 4.4; // the wind recording, set so that it sits well under the song
 const smooth = (a, b, x) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
 // music: the song. town, market: recordings of people talking, for a town heard from its streets and for
-// the thick of a market (either may be missing; then that part is silent).
-export function createSound({ music: musicUrl = null, town: townUrl = null, market: marketUrl = null } = {}) {
+// the thick of a market. wind: a recording of wind, for the far view. (Any may be missing; then that part is silent.)
+export function createSound({ music: musicUrl = null, town: townUrl = null, market: marketUrl = null, wind: windUrl = null } = {}) {
   let ctx = null, master = null, meter = null, on = false;
   let bed = null; // the continuous sounds, each a gain: wind, sea, hiss, cicada, cricket, rustle
   const tapes = { town: { url: townUrl }, market: { url: marketUrl } }; // the recordings of people, fetched when first wanted
@@ -96,21 +97,11 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
       return p;
     };
 
-    // The wind, as it is heard from high up: air moving in a narrow band, whose pitch climbs as it gusts,
-    // and a thin whistle over it. It must not be taken for surf, which is a wide, low noise that swells
-    // and falls: so there is nothing low under it, and a gust is a rise in pitch more than in loudness.
+    // The wind, as it is heard from high up: a recording of a light wind over open ground (src/audio/wind.mp3).
+    // Wind made here from noise was too easily taken for surf, so without the recording there is none.
     const wind = gain();
-    const body = filter('bandpass', 560, 1.7), gust = gain(0.7);
-    loop(white, 0.7).connect(filter('highpass', 240)).connect(body).connect(gust).connect(wind);
-    lfo(0.083, 190, body.frequency);
-    lfo(0.21, 80, body.frequency);
-    lfo(0.083, 0.14, gust.gain);
-    lfo(0.031, 0.1, gust.gain);
-    const whistle = filter('bandpass', 1150, 7), thin = gain(0.24);
-    loop(white, 1.3).connect(whistle).connect(thin).connect(wind);
-    lfo(0.05, 380, whistle.frequency);
-    lfo(0.23, 0.16, thin.gain);
     wind.connect(master);
+    loadWind(wind);
 
     // The sea, as it is heard from the shore: a low wash that swells and falls, and the hiss of foam between.
     const sea = gain(), wash = gain(0.6);
@@ -152,6 +143,33 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
     lfo(0.41, 0.15, leaf.gain);
 
     bed = { wind, sea, hiss, cicada, cricket, rustle };
+  }
+
+  // The wind is a recording held whole in memory, so that it can go round without a seam (an <audio> that
+  // loops an MP3 leaves a gap each time): its end is faded across its beginning. What is kept of it is the
+  // air. The rumble under it goes, the top is lifted so that it can be heard on small speakers, and the
+  // ticks of sand on the microphone are taken off above that.
+  function loadWind(into) {
+    if (!windUrl) return;
+    fetch(windUrl).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('no wind')))).then((data) => ctx.decodeAudioData(data)).then((au) => {
+      const sr = au.sampleRate, skip = Math.floor(0.5 * sr), cross = Math.floor(2.5 * sr), n = au.length - 2 * skip - cross;
+      if (n < sr * 5) return;
+      const round = ctx.createBuffer(au.numberOfChannels, n, sr);
+      for (let c = 0; c < au.numberOfChannels; c++) {
+        const s = au.getChannelData(c), d = round.getChannelData(c);
+        d.set(s.subarray(skip, skip + n));
+        for (let i = 0; i < cross; i++) { // what would have come after the end, giving way to the beginning
+          const k = (i / cross) * Math.PI / 2;
+          d[i] = s[skip + i] * Math.sin(k) + s[skip + n + i] * Math.cos(k);
+        }
+      }
+      const src = ctx.createBufferSource(), lift = filter('highshelf', 1100);
+      lift.gain.value = 8;
+      src.buffer = round;
+      src.loop = true;
+      src.connect(filter('highpass', 230, 0.5)).connect(lift).connect(filter('lowpass', 4200, 0.5)).connect(gain(WIND)).connect(into);
+      src.start();
+    }).catch(() => { /* no wind, then */ });
   }
 
   // The song: a recording, fetched only once sound is wanted. It has its own way out, round the limiter,
