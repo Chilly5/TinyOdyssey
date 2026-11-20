@@ -6,7 +6,7 @@
 const SCALE = [220, 246.94, 261.63, 293.66, 329.63, 392, 440, 493.88, 523.25, 587.33, 659.25]; // A minor, the lyre's strings
 
 export function createSound() {
-  let ctx = null, master = null, on = false;
+  let ctx = null, master = null, meter = null, on = false;
   let bed = null; // the continuous sounds: { sea, hiss, wind, town } gains
   let brown = null, white = null;
   const due = { bird: 1, cricket: 0.5, gull: 4, lyre: 1, hammer: 2 };
@@ -16,7 +16,16 @@ export function createSound() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
     master.gain.value = 0;
-    master.connect(ctx.destination);
+    const limit = ctx.createDynamicsCompressor(); // thunder and a wave arriving together must not clip
+    limit.threshold.value = -9;
+    limit.knee.value = 6;
+    limit.ratio.value = 8;
+    limit.attack.value = 0.004;
+    limit.release.value = 0.25;
+    master.connect(limit).connect(ctx.destination);
+    meter = ctx.createAnalyser(); // only listened to by level(), for checking the mix
+    meter.fftSize = 2048;
+    limit.connect(meter);
     const n = Math.floor(ctx.sampleRate * 4);
     white = ctx.createBuffer(1, n, ctx.sampleRate);
     brown = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -164,9 +173,18 @@ export function createSound() {
       on = want;
       if (want) ctx.resume();
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.setTargetAtTime(want ? 0.7 : 0, ctx.currentTime, want ? 0.6 : 0.15);
+      master.gain.setTargetAtTime(want ? 1.0 : 0, ctx.currentTime, want ? 0.6 : 0.15);
       if (!want) setTimeout(() => { if (!on) ctx.suspend(); }, 900);
       return on;
+    },
+    // How loud it is just now: [rms, peak] of the last few hundredths of a second, 0..1. For checking the mix.
+    level() {
+      if (!meter) return [0, 0];
+      const buf = new Float32Array(meter.fftSize);
+      meter.getFloatTimeDomainData(buf);
+      let sum = 0, peak = 0;
+      for (const v of buf) { sum += v * v; peak = Math.max(peak, Math.abs(v)); }
+      return [Math.sqrt(sum / buf.length), peak];
     },
     // Thunder, when lightning strikes in sight. strength 0..1.
     thunder(strength = 1) {

@@ -457,11 +457,12 @@ async function boot() {
   });
   window.addEventListener('keyup', (e) => held.delete(e.key.toLowerCase()));
   window.addEventListener('blur', () => held.clear());
-  window.addEventListener('resize', () => {
+  const resized = () => {
     viewer.resize();
     goal.zoom = Math.max(goal.zoom, viewer.minZoom);
     labels.measure();
-  });
+  };
+  window.addEventListener('resize', resized);
 
   function fromHash() {
     const h = (location.hash || '').slice(1);
@@ -481,6 +482,9 @@ async function boot() {
     const dt = clamp((now - last) / 1000, 0, 0.1); // the first timestamp can predate `last`
     last = now;
     clock += dt;
+    // A change of size can be missed (it may come while the map is still loading, as a phone's address
+    // bar slides away), and a picture drawn for the wrong size is stretched. So look, every frame.
+    if (canvas.clientWidth && (canvas.clientWidth !== viewer.cssW || canvas.clientHeight !== viewer.cssH)) resized();
 
     if (held.size) {
       const v = (520 / viewer.zoom) * dt;
