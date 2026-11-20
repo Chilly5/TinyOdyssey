@@ -76,7 +76,7 @@ The people, animals and ships are small models built and rendered in **Blender**
 
 **Walking behind things.** The render knows how far south everything in the picture stands. `gen/tiles.mjs` keeps that as tiles of the scenery's height (`world/occ`), every path point carries the height of its ground, and the sprite shader compares the two: the part of a walker that is behind a house, a wall, a tree or a hill is not drawn. Ships pass behind headlands the same way.
 
-**Sound** (`src/sound.js`). A song (`src/audio/theme.mp3`) plays over everything; the rest is made in the browser from noise and oscillators. What is heard depends on how close the view is, in three bands that fade into one another. Over the whole map: the song at its fullest, wind, the sea a murmur. Over a region: the song further back, the swell of the sea, cicadas, a town as a hum. Down among the houses: the song behind everything and the small sounds in front, voices in the market, a smith's hammer, a wave arriving, a bird in the nearest tree, sheep and their bells in the hills, crickets and an owl at night.
+**Sound** (`src/sound.js`). A song (`src/audio/theme.mp3`) plays over everything, and everything else is kept well under it. What is heard depends on how close the view is, in three bands that fade into one another. Over the whole map, seen from high up: the song at its fullest, and the wind. Over a region: the song further back, the wind dropping, the sea coming in where there is a coast. Down on the ground: waves on the shore, the murmur of a town and its market, and in the country leaves, cicadas, small birds, a woodpecker, bees, sheep; at night crickets, frogs and an owl. The town and the market are two recordings (below); the rest is made in the browser from noise and oscillators, and none of it plays a tune.
 
 **Day and night** (`src/main.js`, the last shader in `src/viewer.js`). A day is five minutes. At dusk the light warms, then the picture cools and darkens, a lamp comes on at every house and fire (their places come from the town plan), most people go indoors and the birds roost. **N** or the button holds it at day or night.
 
@@ -184,6 +184,8 @@ An image model redrew every tree, wall and figure. It follows the render closely
 ## Credits
 
 Elevation and bathymetry come from the Mapzen terrain tiles hosted on the AWS Open Data registry, which combine SRTM, GMTED2010 and ETOPO1 among other sources. Full attribution: <https://github.com/tilezen/joerd/blob/master/docs/attribution.md>.
+
+The voices of the towns are two recordings from [Freesound](https://freesound.org), both given to the public domain (CC0): [Crowd walla at outdoor farmers' market](https://freesound.org/people/craigsmith/sounds/675026/) by craigsmith, from the USC optical sound effects library, and [MARKET](https://freesound.org/people/SamuelGremaud/sounds/544338/) by SamuelGremaud, a village market in Provence.
 
 Painted with [FLUX.2 klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) by Black Forest Labs. The sampling method is MultiDiffusion ([Bar-Tal et al.](https://arxiv.org/abs/2302.08113)) with RePaint-style holding ([Lugmayr et al.](https://arxiv.org/abs/2201.09865)), as described in the write-ups linked at the top. Units and moving parts modelled and rendered with [Blender](https://www.blender.org/).
 

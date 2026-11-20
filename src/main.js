@@ -111,7 +111,11 @@ async function boot() {
   lightUp([]);
 
   // ------------------------------------------------------------------- sound --
-  const sound = createSound({ music: new URL('./audio/theme.mp3', import.meta.url).href });
+  const sound = createSound({
+    music: new URL('./audio/theme.mp3', import.meta.url).href,
+    town: new URL('./audio/market.mp3', import.meta.url).href, // a crowd's murmur, from an old film-studio library
+    market: new URL('./audio/village.mp3', import.meta.url).href, // a village market, close to
+  });
   let seaField = null; // the builder's map of how far the shore is, read once the sound is first turned on
   function hearSea() {
     if (seaField) return;
@@ -133,8 +137,7 @@ async function boot() {
     return smooth(-0.3, 0.45, (seaField.px[(j * seaField.w + i) * 4] / 255) * 3 - 0.75);
   };
   const towns = SITES.filter((s) => s.town);
-  const musical = M.effects.filter((e) => e.t === 'glyph' && (e.g || 'note') === 'note');
-  const heard = { sea: 0, land: 0, town: 0, near: 0, night: 0, notes: 0, zoom: 1, crowd: 0 };
+  const heard = { sea: 0, land: 0, shore: 0, town: 0, near: 0, night: 0, zoom: 1, crowd: 0 };
   function listen(dt) {
     if (!sound.on) return;
     const b = viewer.bounds(), zd = viewer.zoom;
@@ -142,6 +145,11 @@ async function boot() {
     for (const [u, v] of [[0.5, 0.5], [0.25, 0.3], [0.75, 0.3], [0.25, 0.7], [0.75, 0.7]]) sea += seaAt(b[0] + (b[2] - b[0]) * u, b[1] + (b[3] - b[1]) * v) / 5;
     heard.sea = sea;
     heard.land = 1 - sea;
+    // The sea in sight, or just out of it: a harbour town hears its waves though the view is all rooftops.
+    const mx = (b[0] + b[2]) / 2, my = (b[1] + b[3]) / 2, rx = Math.max(b[2] - b[0], 70), ry = Math.max(b[3] - b[1], 45);
+    let ring = 0;
+    for (const [u, v] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) ring += seaAt(mx + u * rx, my + v * ry) / 8;
+    heard.shore = Math.max(sea, Math.min(1, ring * 1.3) * 0.7);
     heard.near = smooth(0.25, 3, zd);
     heard.night = viewer.night;
     let town = 0;
@@ -150,9 +158,6 @@ async function boot() {
       if (q) town = Math.max(town, 1 - Math.hypot(viewer.cx - q.x, (viewer.cy - q.y) * 1.4) / (q.r * 2.4));
     }
     heard.town = Math.max(0, town) * smooth(0.8, 3, zd);
-    let notes = 0;
-    if (zd > 1) for (const e of musical) if (e.x > b[0] && e.x < b[2] && e.y > b[1] && e.y < b[3]) notes = 1;
-    heard.notes = notes;
     heard.zoom = zd;
     // The people in sight: a dozen is a busy street. (Until they have loaded, a town stands in for them.)
     heard.crowd = people ? Math.min(1, people.crowd / 12) : heard.town;
