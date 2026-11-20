@@ -45,6 +45,7 @@ if (site) { // link previews want whole addresses
 let files = 0, bytes = 0;
 const walk = (dir) => {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === '.git') continue; // not part of the site
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p);
     else { files++; bytes += fs.statSync(p).size; }

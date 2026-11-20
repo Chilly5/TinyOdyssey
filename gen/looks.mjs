@@ -67,7 +67,13 @@ const tones = (steps) => cache((ramp) => {
 });
 // The ground, sheets of card: 3 the top of a sheet, 4 the lip of its ledge in the sun, 2 down to 0 its cut
 // edge, deeper as it turns from the light.
-const sheet = tones([[0.5, 56, 62, 126, 0.82], [0.34, 76, 84, 140, 0.9], [0.18, 100, 104, 150, 0.96], [0.02, 255, 252, 235], [0.3, 255, 253, 238]]);
+const sheet = tones([[0.5, 56, 62, 126, 0.82], [0.34, 76, 84, 140, 0.9], [0.17, 100, 104, 150, 0.95], [0.0, 255, 252, 235], [0.24, 255, 252, 232]]);
+// Shade in this look is a cool wash over whatever it falls on: darker by a third, bluer, the colour still there.
+// (It keeps the alpha, which says what kind of pixel it is.)
+const wash = cache((c) => {
+  const [r, g, b, a] = un(c);
+  return pack(Math.round(r * 0.58 + 10), Math.round(g * 0.6 + 12), Math.round(b * 0.7 + 30), a);
+});
 // What stands on it, lit by which way each face looks: 4 in full sun (a top, a west face) and no paler
 // than its own colour, 2 a face out of the sun, 0 turned right away or in something's shadow.
 const solid = tones([[0.6, 44, 46, 112, 0.74], [0.42, 62, 66, 130, 0.84], [0.24, 90, 94, 146, 0.93], [0.1, 118, 120, 158], [0.07, 255, 250, 226]]);
@@ -97,11 +103,14 @@ const voxel = {
     return out;
   },
   shade: shadeOf(0.36),
+  shadow: wash,
   dither: false,
   texture: false,
   rim: 0.3,
   finish: null,
-  view: { bloom: 0.5 }, // for the viewer: pale flat colour glows more than it should
+  // For the viewer: flat colour has nothing as bright as the pixel look's highlights, so the glow starts
+  // lower (sunlit sand and marble take it) and is a little stronger.
+  view: { bloom: 0.85, glow: 0.81 },
 };
 
 export const LOOKS = { voxel, pixel }; // the first is the one a visitor sees first

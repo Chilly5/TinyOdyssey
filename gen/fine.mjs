@@ -192,6 +192,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
         // Which kind of ground: the coarse layout's, read a little off to one side so that borders wander.
         let b;
         let level = 3;
+        let slope = 0; // which way the ground leans there: towards the sun (2, 1) or away (-1, -2)
         let farmed = false;
         if (bF[kb0] & F_FARM && !(pf & (PF.ROAD | PF.PAVED | PF.WALL | PF.PIER))) {
           // A field: the same plot as the coarse picture, with its rows.
@@ -215,6 +216,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
           level = nb > 0.66 ? 4 : nb < 0.33 ? 2 : 3;
           const hs = gxh * 0.5 + gzh * 0.3;
           const tilt = hs > 1.05 ? 2 : hs > 0.3 ? 1 : hs < -1.05 ? -2 : hs < -0.3 ? -1 : 0;
+          slope = tilt;
           level = clamp(level + tilt, tilt < -1 ? 0 : 1, 4);
           fT[k] = gxh > 1.3 ? 2 : gxh > 0.4 ? 1 : gxh < -1.3 ? -2 : gxh < -0.4 ? -1 : 0;
           if (b === B.YARD) level = 3 + (hash2(fx, fz, 72) < 0.06 ? 1 : 0) - (noise2(fx * fine2, fz * fine2, 73) < 0.3 ? 1 : 0);
@@ -276,7 +278,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
           // Clean card: a top is one tone, a field keeps only its broad rows, a way its edge.
           if (b === B.MASON) level = verge[k] ? 4 : 3;
           else if (pf & (PF.ROAD | PF.PAVED | PF.PIER)) level = verge[k] ? 2 : 3;
-          else if (!farmed) level = 3;
+          else if (!farmed) level = slope >= 2 ? 4 : slope < 0 ? 2 : 3; // no texture, but the lie of the land: lit where it faces the sun, dim where it turns away
           else if (level > 3) level = 3;
         }
         fH[k] = hv;
@@ -338,7 +340,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
             const dn = dep * (1 + w1 * 0.55 + di * 2) + w2 * 60;
             c = dn < 330 ? SEA.mid : dn < 1350 ? SEA.sea : dn < 2700 ? SEA.deep : SEA.abyss;
           }
-          if (shaded(bx, bz, 3) || (lmShade !== null && lmShade(fx, 0, fz))) c = look.shade(c);
+          if (shaded(bx, bz, 3) || (lmShade !== null && lmShade(fx, 0, fz))) c = (look.shadow || look.shade)(c);
           const p = row(fz, 0) * iw + px;
           img[p] = c;
           zb[p] = zr;
@@ -354,8 +356,10 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
           // The lit rim of a ledge, and the dim strip at the foot of the one behind.
           if (hs < h || hw < h || (rimW > 1 && (fH[k + fw * rimW] < h || fH[k - rimW] < h || fH[k + rimW] < h))) level = Math.min(4, level + 1);
           else if (hn > h + F || (footW > 1 && (fH[k - fw * footW] > h + F || fH[k + footW] > h + F))) level = Math.max(0, level - 1);
-          if (shade) level = Math.max(0, level - 2);
+          // Shade is one clean tone (two would be grain), the lip of a ledge a little lighter in it.
+          if (shade && !look.shadow) level = level >= 4 ? 2 : 1;
           c = (Math.round((h / F - 1) / 3) & 1 ? TOPALT : TOP)[b][level];
+          if (shade && look.shadow) c = look.shadow(c);
         }
         let p = yTop * iw + px;
         img[p] = c;
@@ -365,28 +369,34 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
           const mason = b === B.MASON;
           const wr = b === B.RIVER ? null : mason ? stone : h - hs >= 7 * F ? rock : WALL[b]; // tall drops are bare cliff
           const wallShade = shaded(bx, bz + 1 / F, ((hs + h) / F) * 4) || (lmShade !== null && lmShade(fx, (hs + h) >> 1, fz + 1));
-          const wl0 = 2 + fT[k] - (wallShade ? 1 : 0);
+          // A low edge is lit by which way it turns. A cliff is not: turn by turn down its whole height that makes stripes.
+          const wl0 = 2 + (wr === rock ? 0 : fT[k]) - (wallShade && !look.shadow ? 1 : 0);
           const isRock = wr === rock;
           const bed = isRock ? Math.round((5 + ((hash2(Math.round(bx) >> 4, Math.round(bz) >> 5, 143) * 3) | 0)) * Math.max(1, F * 0.55)) : 0; // rows between bedding lines
-          const crack = isRock && F >= 4 ? noise2(fx / (F * 1.7), bz / 3, 144) : 0;
           const course = Math.max(3, Math.round(F * 0.7));
           for (let y = yTop + 1; y < yB; y++) {
             const ay = y + iy0;
             let wl;
             if (mason) { // courses of dressed stone, the joints staggered
               const r = Math.floor(ay / course);
-              wl = 3 - (wallShade ? 1 : 0) - (ay % course === 0 || (fx + (r & 1) * course) % (course * 2) === 0 ? 1 : 0) + (F >= 8 && hash2((fx + (r & 1) * course) / (course * 2) | 0, r, 145) < 0.2 ? 1 : 0);
+              wl = 3 - (wallShade && !look.shadow ? 1 : 0) - (ay % course === 0 || (fx + (r & 1) * course) % (course * 2) === 0 ? 1 : 0) + (F >= 8 && hash2((fx + (r & 1) * course) / (course * 2) | 0, r, 145) < 0.2 ? 1 : 0);
             } else {
               wl = wl0 - (y === yB - 1 ? 1 : 0);
               if (look.texture) {
-                wl += (hash2(fx / Math.max(1, F >> 2) | 0, h, 141) < 0.22 ? 1 : 0) - (hash2(fx >> 1, ay / Math.max(1, F >> 2) | 0, 142) < 0.18 ? 1 : 0);
-                if (bed && (ay + ((fx / Math.max(1, F)) | 0) * 2) % bed < Math.max(1, F >> 2)) wl--;
-                if (crack > 0.78) wl--;
-                else if (y - yTop <= Math.max(1, F >> 2)) wl++; // the lit lip
+                // Stone in broad blocks, wider than they are tall, a tone lighter or darker; beds running
+                // across it. Nothing column by column (that reads as rain), and nothing at all in shade.
+                if (!wallShade) {
+                  const blk = noise2(fx / (F * 3.4) + ay / (F * 11), ay / (F * 1.4), 141);
+                  wl += blk > 0.72 ? 1 : blk < 0.22 ? -1 : 0;
+                }
+                if (bed && (ay + ((fx / Math.max(1, F * 3)) | 0)) % bed < Math.max(1, F >> 2)) wl--;
+                if (y - yTop <= Math.max(1, F >> 2)) wl++; // the lit lip
               } else if (y - yTop <= rimW) wl++;
             }
             p = y * iw + px;
-            img[p] = wr ? wr[clamp(wl, 0, 4)] : ((ay / Math.max(1, F >> 2)) & 1 ? RIVER[2] : SEA.foam); // rivers fall as white water
+            let wc = wr ? wr[clamp(wl, 0, 4)] : ((ay / Math.max(1, F >> 2)) & 1 ? RIVER[2] : SEA.foam); // rivers fall as white water
+            if (wallShade && look.shadow && wr) wc = look.shadow(wc);
+            img[p] = wc;
             zb[p] = zr;
           }
         }
@@ -413,10 +423,12 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
         const p = row(fz, y) * iw + fx - X0;
         const zr = fz - Z0 + 1;
         if (zb[p] > zr) continue;
-        let level = lvs[v] + lean;
+        const dark = shaded(toB(fx), toB(fz), (y / F) * 8 + 6) || (lmShade !== null && lmShade(fx, y, fz));
+        let level = (dark ? m.lp[v] : lvs[v]) + lean; // in shade, by the lie of its surface alone: no speckle
         level = level < 0 ? 0 : level > 4 ? 4 : level;
-        if (shaded(toB(fx), toB(fz), (y / F) * 8 + 6) || (lmShade !== null && lmShade(fx, y, fz))) level = level > 2 ? level - 2 : 0;
-        const c = ramps[m.part[v]][level];
+        let c;
+        if (dark && look.shadow) c = look.shadow(ramps[m.part[v]][level]);
+        else c = ramps[m.part[v]][dark ? (level > 2 ? level - 2 : 0) : level];
         img[p] = c;
         zb[p] = zr;
         // A cube is a pixel wide but 1.4 tall on the picture (its top, then its front), and on a slope of

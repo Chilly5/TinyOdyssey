@@ -12,6 +12,7 @@ import {
   sheep, pig, cow, lion,
 } from './models.js';
 import { MINOR } from './minor.js';
+import { asset } from './assets.mjs';
 
 const TAU = Math.PI * 2;
 const SOUTH = -Math.PI / 2; // rotation that turns a beast (built facing +x) towards the viewer
@@ -23,23 +24,34 @@ function seeded(seed) {
 
 // Birds circling a point.
 function flock(L, o) {
-  const g = new Geo();
-  const c = o.color || C.white;
-  g.box(0, 0, 0, 0.07, 0.05, 0.2, c);
-  g.sheet([0.03, 0.03, -0.06], [0.3, 0.12, -0.02], [0.3, 0.12, 0.06], [0.03, 0.03, 0.08], c);
-  g.sheet([-0.03, 0.03, 0.08], [-0.3, 0.12, 0.06], [-0.3, 0.12, -0.02], [-0.03, 0.03, -0.06], c);
-  const geo = g.build();
+  // The bird is bronze as it comes (the birds of Stymphalos). Any other flock is painted its own colour,
+  // keeping a little of the light and dark of the feathers.
+  const c = o.color;
+  const paint = !c || c === C.bronzeD ? (c ? null : (k) => [0.8 + k[0] * 0.2, 0.8 + k[1] * 0.2, 0.8 + k[2] * 0.2]) : (k) => {
+    const l = 0.6 + (k[0] + k[1] + k[2]) * 0.5;
+    return [c[0] * l, c[1] * l, c[2] * l];
+  };
+  const body = asset(new Geo(), 'bird_body', 0, 0, 0, 0, 1, paint).build();
+  const right = asset(new Geo(), 'bird_wing_r', 0, 0, 0, 0, 1, paint).build();
+  const left = asset(new Geo(), 'bird_wing_l', 0, 0, 0, 0, 1, paint).build();
   const birds = [];
   for (let i = 0; i < o.n; i++) {
-    const m = L.fx.mesh(L.group, geo, { shadow: true });
-    birds.push({ m, r: o.r * (0.7 + 0.5 * ((i * 0.37) % 1)), y: o.y + ((i * 0.61) % 1) * (o.spread ?? 0.6), ph: (i / o.n) * TAU + i });
+    const m = L.fx.mesh(L.group, body, { shadow: true });
+    const wr = L.fx.mesh(m, right, { shadow: true }), wl = L.fx.mesh(m, left, { shadow: true });
+    wr.position.set(0.03, 0.012, 0);
+    wl.position.set(-0.03, 0.012, 0);
+    birds.push({ m, wr, wl, r: o.r * (0.7 + 0.5 * ((i * 0.37) % 1)), y: o.y + ((i * 0.61) % 1) * (o.spread ?? 0.6), ph: (i / o.n) * TAU + i });
   }
+  const size = (o.size || 1) * 0.85;
   L.fx.tick((t) => {
     for (const b of birds) {
       const a = t * (o.speed || 0.5) + b.ph;
       b.m.position.set((o.x || 0) + Math.cos(a) * b.r, b.y + Math.sin(t * 0.7 + b.ph) * 0.1, (o.z || 0) + Math.sin(a) * b.r * 0.8);
       b.m.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a) * 0.8);
-      b.m.scale.set(o.size || 1, (o.size || 1) * (0.2 + 1.5 * Math.sin(t * 9 + b.ph)), o.size || 1);
+      b.m.scale.setScalar(size);
+      const beat = Math.sin(t * 9 + b.ph) * 0.75 + 0.1; // the wings, up and down about the shoulder
+      b.wr.rotation.z = beat;
+      b.wl.rotation.z = -beat;
     }
   });
 }
@@ -482,20 +494,7 @@ export const MODELS = {
     house(g, -0.48, 0.16, -0.5, 0.85, 0);
     house(g, 0.5, 0.16, -0.52, 0.85, 0.6);
     house(g, 0, 0.16, 0.52, 0.8, 0.1);
-    g.at(-0.8, 0, 1.62, -0.45, 1, (q) => { // the horse, left on the plain
-      q.box(0, 0.1, 0, 0.92, 0.06, 0.44, C.woodD);
-      for (const sx of [-0.3, 0.3]) for (const sz of [-0.2, 0.2]) { // its wheels, spoked
-        for (let i = 0; i < 12; i++) {
-          const a0 = (i / 12) * Math.PI * 2, a1 = ((i + 1) / 12) * Math.PI * 2;
-          const p = (a, r, dz) => [sx + Math.cos(a) * r, 0.09 + Math.sin(a) * r, sz + dz];
-          q.triOut(p(0, 0, 0.035), p(a0, 0.09, 0.035), p(a1, 0.09, 0.035), i % 2 ? C.woodD : C.wood, [sx, 0.09, sz - 1]);
-          q.triOut(p(0, 0, -0.035), p(a0, 0.09, -0.035), p(a1, 0.09, -0.035), C.woodD, [sx, 0.09, sz + 1]);
-          q.triOut(p(a0, 0.09, 0.035), p(a1, 0.09, 0.035), p(a1, 0.09, -0.035), C.dark, [sx, 0.09, sz]);
-          q.triOut(p(a0, 0.09, 0.035), p(a1, 0.09, -0.035), p(a0, 0.09, -0.035), C.dark, [sx, 0.09, sz]);
-        }
-      }
-      beast(q, 0, 0.16, 0, 0.8, { body: C.wood, legs: C.woodD, neck: 0.34, headUp: 0.75, snout: C.woodD, mane: C.woodD, tail: C.woodD, legH: 0.44, bodyH: 0.36, bodyW: 0.34 });
-    });
+    asset(g, 'trojan_horse', -0.8, 0, 1.62, -0.45, 0.95); // the horse, left on the plain (made in Blender: units/assets.py)
     L.fx.puffs(L.group, { x: 0.2, y: 0.7, z: -0.1, color: '#5f5a66', n: 6, life: 6, rise: 2.6, size: 0.34, drift: [0.7, 0.1] });
     L.fx.flame(L.group, -0.5, 0.5, 0.2, 0.16);
     L.fx.flame(L.group, 0.5, 0.5, -0.5, 0.14);
@@ -687,17 +686,14 @@ export const MODELS = {
     sheep(g, 0.95, 0, 0.7, 2.2);
     sheep(g, 0.85, 0, 0.42, -1);
     sheep(g, 1.05, 0, 0.5, 1.2);
-    const skin = rgb('#d9a273'), k = 1.5;
-    const pg = new Geo();
-    person(pg, 0, 0, 0, k, { tunic: rgb('#8a6a48'), legs: rgb('#c98f66'), skin, hair: C.dark, eye: true, noArms: true });
-    pg.box(-0.24 * k, 0.36 * k, 0, 0.1 * k, 0.34 * k, 0.12 * k, skin);
-    const body = L.fx.mesh(L.group, pg, { shadow: true });
+    // Polyphemus, made in Blender (units/assets.py): his body, and the arm he throws with hung from its shoulder.
+    const k = 1.5;
+    const body = L.fx.mesh(L.group, asset(new Geo(), 'cyclops_body', 0, 0, 0, 0, k), { shadow: true });
     body.position.set(0.15, 0, 0.1);
     const arm = new THREE.Group();
-    arm.position.set(0.24 * k, 0.7 * k, 0);
+    arm.position.set(0.216 * k, 0.693 * k, 0);
     body.add(arm);
-    const ag = new Geo().box(0, -0.34 * k, 0, 0.1 * k, 0.34 * k, 0.12 * k, skin);
-    L.fx.mesh(arm, ag, { shadow: true });
+    L.fx.mesh(arm, asset(new Geo(), 'cyclops_arm', 0, 0, 0, 0, k), { shadow: true });
     const rockGeo = new Geo().blob(0, 0, 0, 0.26, 0.22, 0.24, C.rockD, { dark: rgb('#5a546e') }).build();
     const held = L.fx.mesh(arm, rockGeo, { shadow: true });
     held.position.y = -0.4 * k;
@@ -919,11 +915,7 @@ export const MODELS = {
     g.gable(0, 0.28, -0.2, 0.68, 0.2, 0.5, C.terracotta, false, C.cream);
     g.box(0, 0, 0.03, 0.12, 0.18, 0.02, C.woodD);
     L.tree('olive', 0.5, -0.1, 1.5); // the olive tree the marriage bed is carved from
-    g.box(-0.5, 0, 0.3, 0.04, 0.36, 0.04, C.woodD); // Penelope's loom
-    g.box(-0.24, 0, 0.3, 0.04, 0.36, 0.04, C.woodD);
-    g.box(-0.37, 0.34, 0.3, 0.3, 0.04, 0.04, C.woodD);
-    g.sheet([-0.48, 0.32, 0.3], [-0.26, 0.32, 0.3], [-0.26, 0.12, 0.3], [-0.48, 0.12, 0.3], rgb('#b9a0d9'));
-    person(g, -0.37, 0, 0.45, 0.34, { tunic: C.blue, hair: C.dark });
+    asset(g, 'penelope', -0.2, 0, 0.36, 0.12, 1.0); // Penelope at her loom, the shroud half woven (units/assets.py)
     beast(g, 0.2, 0, 0.42, 0.2, { rot: -1.2, body: C.wood, ears: true, tail: C.woodD }); // Argos, the old dog
     for (let i = 0; i < 6; i++) { // the axes he will shoot through
       g.box(0.05 + i * 0.07, 0, 0.64, 0.02, 0.14, 0.02, C.woodD);

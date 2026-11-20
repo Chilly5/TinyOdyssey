@@ -93,7 +93,7 @@ if (sheet) {
   const fine = createFine({ base: plain, fields, rivers: fields.rivers, landmarksAt });
   // Where to go deeper: round every place, a little wider than its own ground and as tall as what stands on it.
   // --touch a,b: those places have changed (a model was reworked). Draw them again at every scale, into
-  // the pyramid as it stands: their own tiles at the finer scales, and the rows they lie in at the others.
+  // the pyramid as it stands: just the tiles they lie in.
   const touch = arg('touch') ? arg('touch').split(',') : null;
   const wanted = touch || (arg('places') ? arg('places').split(',') : null);
   const places = [];
@@ -108,20 +108,9 @@ if (sheet) {
   }
   const mf = path.join(out, 'manifest.json');
   if (touch) {
-    const { FULL, SPARSE } = await import('./pyramid.mjs');
     for (const name of arg('look', 'pixel,voxel').split(',')) {
       const common = { base: plain, fine, look: LOOKS[name], out: path.join(out, name), places, lap };
-      buildPyramid({ ...common, only: SPARSE, keep: true, tag: `t-${touch[0]}` });
-      for (const F of FULL) {
-        const spans = places.map((p) => [Math.max(0, Math.floor((p.y0 * F) / 512)), Math.floor((p.y1 * F) / 512) + 1]).sort((a, b) => a[0] - b[0]);
-        const runs = [];
-        for (const s of spans) {
-          const last = runs[runs.length - 1];
-          if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
-          else runs.push([...s]);
-        }
-        for (const rows of runs) buildPyramid({ ...common, only: [F], rows });
-      }
+      buildPyramid({ ...common, spots: true, keep: true, tag: `t-${touch[0]}` });
     }
   } else if (!process.argv.includes('--styles')) {
     for (const name of arg('look', 'pixel,voxel').split(',')) {

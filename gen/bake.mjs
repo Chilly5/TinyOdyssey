@@ -131,7 +131,12 @@ function surface(r, g, b, ny) {
 // highest thing straight overhead. From them a roof shades the wall under its eaves, a column the floor
 // beside it, a statue its plinth, and the whole of it the ground it stands on (.shadow).
 const SUN = 0.8;
-const LIT = []; // the landmarks whose light is in memory: a few at a time, for the maps are large
+// The landmarks whose light is in memory. At the finest scale a map is tens of megabytes and only a few can
+// be kept; at the coarse ones they are small, a band of the picture crosses dozens of landmarks, and to drop
+// any is to make it again on the next row. So they are kept up to a budget of cells, the oldest going first.
+const LIT = [];
+const LIT_BUDGET = 9e7;
+let litCells = 0;
 function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, snap }) {
   const F = snap;
   const meshes = [{ pos: g.pos, col: g.col, n: g.n, el: null, glow: false }];
@@ -180,6 +185,7 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
 
   let maps = null;
   const release = () => { maps = null; };
+  const mine = { release, cells: 0 };
   const light = () => {
     if (maps) return maps;
     const pad = 4;
@@ -216,8 +222,14 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
       for (let v = 0; v < st.n; v++) put(t.ox + st.dx[v], t.oy + st.dy[v], t.oz + st.dz[v]);
     }
     maps = { top, sun, hx0, hz0, hw, hd, sw, sd };
-    LIT.push(release);
-    if (LIT.length > 3) LIT.shift()();
+    mine.cells = hw * hd + sw * sd;
+    litCells += mine.cells;
+    LIT.push(mine);
+    while (litCells > LIT_BUDGET && LIT.length > 1) {
+      const old = LIT.shift();
+      litCells -= old.cells;
+      old.release();
+    }
     return maps;
   };
 
@@ -277,7 +289,7 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
               const p = (Math.round(KZ * gz - KY * gy) - iy0) * iw + gx - X0;
               const zr = gz - Z0 + 1;
               if (zb[p] > zr) continue;
-              let level = level0;
+              let level = level0, shadowed = false;
               if (kind === 1) { // dressed stone: courses, the joints staggered
                 const row = Math.floor(gy / course);
                 if (gy % course === 0 || (gx + gz + (row & 1) * course) % (course * 2) === 0) level--;
@@ -314,9 +326,13 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
                   // And the shadow of whatever else stands near: a hill, a house, a tree.
                   if (dark === 0 && flat && shaded(toB(gx), toB(gz), (gy / F) * 8 + 6)) dark = 2;
                 }
-                level -= dark;
+                // In a shadow there are no joints and no weathering: one clean tone.
+                if (dark >= 2) level = look.shadow ? level0 : level0 - 2;
+                else level -= dark;
+                shadowed = dark >= 2 && !!look.shadow;
               }
-              const col = ramp[level < 0 ? 0 : level > 4 ? 4 : level];
+              let col = ramp[level < 0 ? 0 : level > 4 ? 4 : level];
+              if (shadowed) col = look.shadow(col);
               img[p] = col;
               zb[p] = zr;
               // A slope that falls towards the camera steps down more than a pixel at a time: it takes the
@@ -344,8 +360,9 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
           if (zb[p] > zr) continue;
           let level = lvs[v];
           const q = Math.round((gy - by + 2) * SUN), si = (gx - bx - hx0 + q) >> sh, sj = (gz - bz - hz0 + q) >> sh;
-          if (si >= 0 && sj >= 0 && si < sw && sj < sd && sun[sj * sw + si] > gy - by + 2 + BIAS + F) level = level > 2 ? level - 2 : 0; // in the model's shadow
-          const col = ramps[st.part[v]][level];
+          const dark = si >= 0 && sj >= 0 && si < sw && sj < sd && sun[sj * sw + si] > gy - by + 2 + BIAS + F; // in the model's shadow
+          if (dark) level = st.lp[v];
+          const col = dark && look.shadow ? look.shadow(ramps[st.part[v]][level]) : ramps[st.part[v]][dark ? (level > 2 ? level - 2 : 0) : level];
           img[p] = col;
           zb[p] = zr;
           if (F > 1 && p + iw < img.length && zb[p + iw] < zr) { img[p + iw] = col; zb[p + iw] = zr; } // its front: see fine.mjs

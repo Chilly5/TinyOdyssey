@@ -53,7 +53,9 @@ export const FULL = [1, 2, 4], SPARSE = [8, 16];
 const REACH = 330; // coarse rows: nothing stands so tall that it shows further north of its foot than this
 
 // keep: add to what is there instead of clearing the level first (a few places drawn again); tag: what to call the note.
-export function buildPyramid({ base, fine, look, out, places, lap = () => {}, only = null, rows = null, part = null, keep = false, tag: noteTag = null }) {
+// spots: draw every scale the way the finer ones are drawn, tile by tile round the places only (with keep,
+// that puts a reworked place back into a finished pyramid in a minute).
+export function buildPyramid({ base, fine, look, out, places, lap = () => {}, only = null, rows = null, part = null, keep = false, tag: noteTag = null, spots = false }) {
   const { GW, GD, IW, IH, OY, MAXTOP } = base;
   const full = FULL, sparse = SPARSE;
   fs.mkdirSync(out, { recursive: true });
@@ -71,7 +73,7 @@ export function buildPyramid({ base, fine, look, out, places, lap = () => {}, on
 
   // --- The whole map at each of its scales ---
   for (const F of full) {
-    if (only && !only.includes(F)) continue;
+    if (spots || (only && !only.includes(F))) continue;
     const W = IW * F, H = IH * F;
     const dir = levelDir(F);
     const BANDC = Math.max(32, Math.floor(1024 / F)), BLOCKC = Math.max(256, Math.floor(8192 / F)); // coarse cells to a band, and to a block
@@ -125,7 +127,7 @@ export function buildPyramid({ base, fine, look, out, places, lap = () => {}, on
   }
 
   // --- Round the places, finer ---
-  for (const F of sparse) {
+  for (const F of spots ? [...full, ...sparse] : sparse) {
     if (only && !only.includes(F)) continue;
     const W = IW * F, H = IH * F;
     const dir = levelDir(F);
@@ -190,7 +192,8 @@ export function buildPyramid({ base, fine, look, out, places, lap = () => {}, on
       }
       if (n % 10 === 9 || n === rects.length - 1) lap(`  scale ${F}: ${n + 1} of ${rects.length} places, ${done.size} tiles`);
     });
-    info[F] = { w: W, h: H, cols: Math.ceil(W / TILE), rows: Math.ceil(H / TILE), tiles: [...done].map((k) => `${k % 65536}_${Math.floor(k / 65536)}`).sort() };
+    // (A whole-map scale drawn in spots keeps the note it has: it is still whole.)
+    if (sparse.includes(F)) info[F] = { w: W, h: H, cols: Math.ceil(W / TILE), rows: Math.ceil(H / TILE), tiles: [...done].map((k) => `${k % 65536}_${Math.floor(k / 65536)}`).sort() };
   }
 
   // --- Below scale 1: halvings ---

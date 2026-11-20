@@ -885,7 +885,7 @@ export function createViewer(canvas, manifest, base) {
         set && set(prog.u);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       };
-      pass(progBright, halfA, hw, hh, scene, (u) => gl.uniform1f(u.uThreshold, 0.86));
+      pass(progBright, halfA, hw, hh, scene, (u) => gl.uniform1f(u.uThreshold, P.glow ?? 0.86));
       pass(progBlur, halfB, hw, hh, halfA, (u) => gl.uniform2f(u.uStep, 1.2 / hw, 0));
       pass(progBlur, halfA, hw, hh, halfB, (u) => gl.uniform2f(u.uStep, 0, 1.2 / hh));
       pass(progBlur, quartB, qw, qh, halfA, (u) => gl.uniform2f(u.uStep, 1.6 / qw, 0));

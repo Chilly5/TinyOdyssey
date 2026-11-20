@@ -191,6 +191,20 @@ class Model:
         self._add(ring(*rings[-1]), [tuple(range(n))], col)
         return self
 
+    def loft(self, rings, col, flip=False, smooth=True):
+        """A skin stretched over a row of rings, each the same number of points going round the same way
+        (the planking of a hull over its ribs, a sail over its ropes). flip turns it to face the other way."""
+        n = len(rings[0])
+        pts = [tuple(p) for r in rings for p in r]
+        faces = []
+        for k in range(len(rings) - 1):
+            a0, b0 = k * n, (k + 1) * n
+            for i in range(n - 1):
+                q = (a0 + i, a0 + i + 1, b0 + i + 1, b0 + i)
+                faces.append(q[::-1] if flip else q)
+        (self._round if smooth else self._add)(pts, faces, col)
+        return self
+
     def prism(self, x, y, z, r0, r1, h, col, n=8, axis="Z"):
         """A many-sided column (or cone) standing on (x, y, z); axis Y lays it on its side as a disc."""
         pts, faces = [], []
@@ -246,11 +260,15 @@ def human(m, t, o):
     # arms
     pose = o.get("arms", "swing")
     for side, a in ((1, -sw), (-1, sw)):
+        if o.get("noarm") == side:   # left off, to be hung on separately and moved (units/assets.py)
+            continue
         ang = a
         if pose == "up" or (pose == "rightup" and side == -1):
             ang = 165 + (math.sin(t * math.tau) * 12 if o.get("still") else 0)
         elif pose == "carry" or (pose == "hold" and side == -1):
             ang = 70
+        elif pose == "stick" and side == -1:   # leaning on a walking stick, planted a little ahead
+            ang = 20 + math.sin(t * math.tau) * 6
         elif pose == "work":
             ang = 95 + math.sin(t * math.tau) * 55
         m.at(0, side * 3.3, 10.6, ry=-ang)
@@ -453,115 +471,189 @@ def beast(m, t, o):
 
 
 def bird(m, t, o):
-    """A big bird on the wing, facing +x."""
+    """A big bird on the wing, facing +x: a body, a head and beak, a fanned tail, and wings in two joints
+    that beat, with the long feathers spread at their tips."""
     fl = math.sin(t * math.tau)
     body = o.get("body", "feather2")
-    m.box(-3, -1.2, 0, 3, 1.2, 2, body)
-    m.box(3, -1, 0.6, 4.6, 1, 2.6, o.get("head", "white"))
-    m.box(4.6, -0.5, 1, 5.8, 0.5, 1.8, o.get("beak", "gold"))
-    m.box(-5.2, -1.6, 0.6, -3, 1.6, 1.3, o.get("tail", body))
+    tips = o.get("tips", body)
+    m.ball(0, 0, 1.1, 3.3, 1.35, 1.2, body, 10)
+    m.ball(1.4, 0, 0.8, 1.9, 1.15, 0.9, o.get("breast", body), 8)
+    m.ball(3.5, 0, 1.6, 1.15, 1.0, 1.0, o.get("head", "white"), 8)
+    m.prism(4.4, 0, 1.45, 0.5, 0.0, 1.7, o.get("beak", "gold"), 5, "Z")
+    m.at(4.3, 0, 1.5, ry=90)
+    m.prism(0, 0, 0, 0.5, 0.05, 1.8, o.get("beak", "gold"), 5)
+    m.pop()
     for sd in (1, -1):
-        m.at(0, sd * 1.2, 1.6, rx=sd * (-fl * 38))
-        y0, y1 = (0, o.get("span", 8)) if sd > 0 else (-o.get("span", 8), 0)
-        m.box(-2.2, y0, -0.3, 2.4, y1, 0.4, body)
-        m.box(-3.4, y0 + (3 if sd > 0 else 0), -0.3, -2.2, y1 - (0 if sd > 0 else 3), 0.3, o.get("tips", body))
+        m.ball(3.9, sd * 0.75, 1.85, 0.22, 0.16, 0.22, "eye", 5)
+    for k in range(-2, 3):   # the tail, a fan
+        m.at(-2.9, 0, 1.0, rz=k * 13)
+        m.box(-3.0, -0.55, -0.12, 0.2, 0.55, 0.12, o.get("tail", body) if k % 2 == 0 else tips)
+        m.pop()
+    span = o.get("span", 8)
+    for sd in (1, -1):
+        m.at(0.3, sd * 1.0, 1.6, rx=sd * (-fl * 34))
+        y0, y1 = (0, span * 0.52) if sd > 0 else (-span * 0.52, 0)
+        m.box(-1.9, y0, -0.25, 2.3, y1, 0.3, body)                       # the arm of the wing
+        m.at(0.2, sd * span * 0.5, 0, rx=sd * (-fl * 22))               # the hand, which bends further
+        z0, z1 = (0, span * 0.5) if sd > 0 else (-span * 0.5, 0)
+        m.box(-1.5, z0, -0.2, 1.9, z1, 0.25, body)
+        for k in range(5):                                               # the flight feathers, spread
+            m.at(1.5 - k * 0.75, sd * span * 0.44, 0, rz=sd * (-12 + k * 9))
+            m.box(-0.33, 0 if sd > 0 else -span * 0.26, -0.1, 0.33, span * 0.26 if sd > 0 else 0, 0.1, tips if k % 2 == 0 else body)
+            m.pop()
+        m.pop()
+        for k in range(4):                                               # the trailing edge
+            m.box(-2.9, sd * (0.5 + k * span * 0.12) - 0.42, -0.1, -1.7, sd * (0.5 + k * span * 0.12) + 0.42, 0.12, tips if k % 2 else body)
         m.pop()
 
 
 # --------------------------------------------------------------------- ships --
+def _hull(m, L, beam, hull, trim, deck, depth=1.6, base=3.0, rise=24.0):
+    """The skin of a hull L long: ribs from stern to stem, each from one rail round under the keel to the
+    other; a rail in the ship's colour; a deck. Returns half_width(x) and sheer(x), the rail's line."""
+    n = 16
+    half = lambda u: beam * max(0.0, 1 - abs(u) ** 2.6) ** 0.7 + 0.5
+    sheer = lambda u: base + rise * max(0.0, abs(u) - 0.55) ** 1.6
+    ribs, planks = [], []
+    for k in range(n + 1):
+        u = -1 + 2 * k / n
+        x, hw, zs = u * L / 2, half(u), sheer(u)
+        keel = -depth * (1 - 0.5 * abs(u) ** 3)
+        rib = []
+        for a in range(-4, 5):   # from the port rail, down round the keel, up to the starboard rail
+            v = a / 4
+            rib.append((x, -math.sin(v * math.pi / 2) * hw, keel + (zs - keel) * (1 - math.cos(v * math.pi / 2)) ** 0.8))
+        ribs.append(rib)
+        planks.append((x, hw, zs))
+    m.loft(ribs, hull, flip=True)
+    for sd in (1, -1):   # the rail: a band outside, its top, a band inside
+        band = [[(x, sd * (hw + 0.22), zs - 0.2), (x, sd * (hw + 0.3), zs + 1.9), (x, sd * (hw - 0.45), zs + 1.9), (x, sd * (hw - 0.5), zs - 0.2)] for x, hw, zs in planks]
+        m.loft(band, trim, flip=sd < 0, smooth=False)
+    m.loft([[(x, hw - 0.5, zs - 0.15), (x, 0, zs + 0.05), (x, -hw + 0.5, zs - 0.15)] for x, hw, zs in planks], deck, smooth=False)
+    return half, sheer
+
+
 def ship(m, t, o):
     """A galley, bow towards +x. Lengths in cubes; t rows the oars."""
     L = o.get("len", 56)
     hull, trim, deck = o.get("hull", "wood2"), o.get("trim", "red"), o.get("deck", "wood")
     beam = o.get("beam", 7)
-    n = L // 2
-    for i in range(-n, n):           # the hull, slice by slice
-        u = (i + 0.5) / n
-        hw = beam * (1 - abs(u) ** 2.6) ** 0.7 + 0.6
-        rise = 6 * max(0, abs(u) - 0.55) ** 1.6 * 4
-        m.box(i * 2, -hw, -1.5 + rise * 0.5, i * 2 + 2, hw, 3 + rise, hull)
-        m.box(i * 2, -hw + 0.9, 3 + rise, i * 2 + 2, hw - 0.9, 3.5 + rise, deck)
-        for sd in (1, -1):          # the rail, in the ship's colour
-            m.box(i * 2, sd * hw - 0.65, 3 + rise, i * 2 + 2, sd * hw + 0.65, 5 + rise, trim)
-    # stern post, curling forward; bow post and ram
-    for k in range(7):
-        m.box(-L / 2 - 1 + min(k, 4) * -0.3 + max(0, k - 4) * 1.6, -1, 6 + k * 2, -L / 2 + 1.4 + min(k, 4) * -0.3 + max(0, k - 4) * 1.6, 1, 8.2 + k * 2, hull)
-    m.box(L / 2 - 2, -1, 5, L / 2 + 0.4, 1, 12, hull)
-    if o.get("ram", True):
-        m.box(L / 2 - 1, -1.2, -1, L / 2 + 5, 1.2, 1.2, "bronze")
-    for sd in (1, -1):                # the painted eye
-        m.box(L / 2 - 8, sd * (beam * 0.62), 3.6, L / 2 - 5, sd * (beam * 0.62 + 0.3), 5.4, "white")
-        m.box(L / 2 - 7, sd * (beam * 0.62 + 0.3), 4, L / 2 - 6, sd * (beam * 0.62 + 0.5), 5, "eye")
+    half, sheer = _hull(m, L, beam, hull, trim, deck)
+    at = lambda x: (half(2 * x / L), sheer(2 * x / L))
+    # The stern post, curling up and forward over the helmsman, its end split like a fan; the stem post at the bow.
+    curl = [(-L / 2 + 0.6, 0, 6), (-L / 2 - 1.6, 0, 10.5), (-L / 2 - 1.4, 0, 15), (-L / 2 + 1.2, 0, 18.4), (-L / 2 + 4.6, 0, 19.2)]
+    for a, b in zip(curl, curl[1:]):
+        m.limb(a, b, 1.0, 0.85, hull, 7)
+    for dy in (-1.3, 0, 1.3):
+        m.limb(curl[-1], (curl[-1][0] + 2.6, dy, curl[-1][2] - 0.6 - abs(dy) * 0.3), 0.6, 0.25, trim, 6)
+    stem = [(L / 2 - 1.2, 0, 5), (L / 2 + 1.0, 0, 9.5), (L / 2 + 0.4, 0, 13), (L / 2 - 1.6, 0, 14.6)]
+    for a, b in zip(stem, stem[1:]):
+        m.limb(a, b, 0.95, 0.75, hull, 7)
+    if o.get("ram", True):   # the bronze ram at the waterline, three-finned
+        m.limb((L / 2 - 2.5, 0, 0.3), (L / 2 + 6.2, 0, -0.2), 1.5, 0.5, "bronze", 8)
+        for dz in (-0.9, 0, 0.9):
+            m.box(L / 2 + 2.5, -1.25, -0.2 + dz - 0.22, L / 2 + 6.4, 1.25, -0.2 + dz + 0.22, "bronze")
+    for sd in (1, -1):       # the painted eye
+        hw, zs = at(L / 2 - 6.5)
+        m.ball(L / 2 - 6.5, sd * (hw + 0.1), zs - 1.3, 1.6, 0.3, 1.0, "white", 8)
+        m.ball(L / 2 - 6.2, sd * (hw + 0.28), zs - 1.3, 0.6, 0.2, 0.6, "eye", 6)
     if o.get("shields"):
-        for i in range(-n + 5, n - 6, 3):
+        for j in range(int((L - 20) / 3.4) + 1):   # hung along the rail, bow to stern
+            x = -L / 2 + 10 + j * 3.4
+            hw, zs = at(x)
             for sd in (1, -1):
-                hw = beam * (1 - abs((i + 0.5) / n) ** 2.6) ** 0.7 + 0.6
-                m.prism(i * 2 + 1, sd * (hw + 0.2), 3.4, 1.6, 1.6, 0.5, o["shields"][(i // 3) % len(o["shields"])], 8, "Y")
-    # oars
+                m.prism(x, sd * (hw + 0.35) - (0.5 if sd < 0 else 0), zs + 0.6, 1.6, 1.4, 0.5, o["shields"][j % len(o["shields"])], 12, "Y")
+                m.prism(x, sd * (hw + 0.6) - (0.3 if sd < 0 else 0), zs + 0.6, 0.5, 0.3, 0.3, "gold", 8, "Y")
+    # oars: round looms and flat blades, rowed together
     if o.get("oars", 0):
         ph = math.sin(t * math.tau)
         k = o["oars"]
         for i in range(k):
             x = -L * 0.3 + i * (L * 0.56 / max(1, k - 1))
+            hw, zs = at(x)
             for sd in (1, -1):
-                m.at(x, sd * (beam * 0.8), 3.2, rz=sd * (ph * 24), rx=sd * (18 + abs(ph) * 6))
-                m.box(-0.35, 0 if sd > 0 else -11, -0.35, 0.35, 11 if sd > 0 else 0, 0.35, "wood")
-                m.box(-0.8, 9 if sd > 0 else -11, -0.35, 0.8, 11 if sd > 0 else -9, 0.35, "wood")
+                m.at(x, sd * hw, zs + 0.3, rz=sd * (ph * 24), rx=sd * (18 + abs(ph) * 6))
+                m.limb((0, 0, 0), (0, sd * 9.4, 0), 0.32, 0.28, "wood", 6)
+                m.ball(0, sd * 10.4, 0, 0.75, 1.5, 0.22, "wood", 6)
                 m.pop()
-    # steering oar
-    m.at(-L / 2 + 5, -beam * 0.8, 5, rx=-30)
-    m.box(-0.5, -0.5, -9, 0.5, 0.5, 2, "wood")
-    m.box(-1.2, -0.5, -11, 1.2, 0.5, -7, "wood")
-    m.pop()
-    # mast, yard, sail
+    for sd in (1, -1):       # the steering oars, one on each quarter
+        hw, zs = at(-L / 2 + 5)
+        m.at(-L / 2 + 5, sd * (hw + 0.2), zs + 2, rx=sd * 24, ry=-18)
+        m.limb((0, 0, 2.5), (0, 0, -8), 0.4, 0.36, "wood", 6)
+        m.ball(0, 0, -9.3, 1.1, 0.25, 2.0, "wood", 6)
+        m.pop()
+    # mast, yard, sail and its ropes
     if o.get("mast", True):
         mx = o.get("mastx", 2)
         mh = o.get("masth", 30)
-        m.box(mx - 0.8, -0.8, 3, mx + 0.8, 0.8, 3 + mh, "wood2")
+        m.limb((mx, 0, 2.6), (mx, 0, 3 + mh + 2.5), 0.85, 0.5, "wood2", 8)
         yw = o.get("yard", beam * 2.3)
-        m.box(mx - 0.5, -yw, mh, mx + 0.5, yw, mh + 1.2, "wood2")
+        m.limb((mx + 0.6, -yw, mh + 0.6), (mx + 0.6, yw, mh + 0.6), 0.5, 0.5, "wood2", 7)
         sail = o.get("sail", "sail")
         if sail:
-            rows = 6
+            rows, cols_ = 6, 6
             sh = (mh - 9) / rows
-            for r in range(rows):       # bellied out towards the bow
-                bulge = 3.2 * math.sin((r + 0.5) / rows * math.pi) + 0.6
-                col = o["stripe"] if o.get("stripe") and r % 2 else sail
-                m.box(mx + bulge - 0.5, -yw + 0.8, mh - (r + 1) * sh, mx + bulge + 0.5, yw - 0.8, mh - r * sh, col)
+            for r in range(rows):       # cloth by cloth, bellied out towards the bow, deepest in the middle
+                band = []
+                for edge in (r, r + 1):
+                    v = edge / rows
+                    line = []
+                    for c in range(cols_ + 1):
+                        w = c / cols_ * 2 - 1
+                        bulge = (3.6 * math.sin(v * math.pi) + 0.5) * (1 - 0.35 * w * w)
+                        line.append((mx + 0.9 + bulge, w * (yw - 0.6) * (1 - 0.06 * v), mh - edge * sh))
+                    band.append(line)
+                m.loft(band, o["stripe"] if o.get("stripe") and r % 2 else sail)
             if o.get("device"):       # an emblem on the sail
-                m.box(mx + 3.9, -3, mh - 4.6 * sh, mx + 4.5, 3, mh - 1.6 * sh, o["device"])
+                m.ball(mx + 4.5, 0, mh - 3.1 * sh, 0.5, 3.2, 3.2, o["device"], 12)
+            for sd in (1, -1):        # the sheets, from the foot of the sail to the rail
+                hw, zs = at(mx - 8)
+                m.limb((mx + 1.3, sd * (yw - 1), mh - rows * sh), (mx - 8, sd * hw, zs + 1.5), 0.12, 0.12, "cloth", 4, False)
         else:
-            m.box(mx - 0.9, -yw + 1, mh - 1.6, mx + 0.9, yw - 1, mh, "sail")   # furled
-        m.box(mx - 0.4, -0.4, 3 + mh, mx + 0.4, 0.4, 3 + mh + 3, "wood2")
-        m.box(mx - 3.6, -0.3, 3 + mh + 1, mx - 0.4, 0.3, 3 + mh + 3, o.get("flag", trim))
+            m.limb((mx + 0.7, -yw + 1, mh - 0.4), (mx + 0.7, yw - 1, mh - 0.4), 0.95, 0.95, "sail", 7)   # furled
+        m.limb((mx, 0, 3 + mh + 1), (L / 2 - 1, 0, 9), 0.12, 0.12, "cloth", 4, False)      # the forestay
+        m.limb((mx, 0, 3 + mh + 1), (-L / 2 + 2, 0, 9.5), 0.12, 0.12, "cloth", 4, False)   # the backstay
+        m.box(mx - 3.8, -0.15, 3 + mh + 0.6, mx - 0.4, 0.15, 3 + mh + 2.4, o.get("flag", trim))
     # crew: heads and shoulders along the benches
     for i in range(o.get("crew", 0)):
         x = -L * 0.3 + (i + 0.5) * (L * 0.56 / o["crew"])
+        hw, zs = at(x)
         for sd in (1, -1):
-            m.box(x - 0.9, sd * 2.6 - 1.1, 3.4, x + 0.9, sd * 2.6 + 1.1, 5.4, ("cream", "red", "blue", "cream")[i % 4])
-            m.box(x - 0.9, sd * 2.6 - 0.9, 5.4, x + 0.9, sd * 2.6 + 0.9, 7.2, "skin")
-            m.box(x - 1, sd * 2.6 - 1, 6.8, x + 0.6, sd * 2.6 + 1, 7.5, "hair")
+            y = sd * min(2.6, hw - 1.6)
+            m.ball(x, y, zs + 1.3, 1.0, 1.2, 1.4, ("cream", "red", "blue", "cream")[i % 4], 7)
+            m.ball(x, y, zs + 3.2, 0.9, 0.9, 0.95, "skin", 7)
+            m.ball(x - 0.15, y, zs + 3.5, 0.95, 0.95, 0.8, "hair", 7)
     if o.get("captain"):
-        m.at(-L / 2 + 8, 0, 3.4, s=0.62)
+        hw, zs = at(-L / 2 + 8)
+        m.at(-L / 2 + 8, 0, zs, s=0.62)
         human(m, 0, {**o["captain"], "still": True})
         m.pop()
-    if o.get("cargo"):
+    if o.get("cargo"):          # jars, and a sack or two
         for i, c in enumerate(o["cargo"]):
-            m.prism(-6 + i * 4.5, (i % 2 - 0.5) * 3, 3.4, 1.5, 1.9, 3.2, c, 8)
+            x, y = -6 + i * 4.5, (i % 2 - 0.5) * 3
+            hw, zs = at(x)
+            if i % 3 == 2:
+                m.ball(x, y, zs + 1.1, 2.0, 1.6, 1.2, c, 8)
+            else:
+                m.tube(x, y, zs, [(0.7, 0.7, 0), (1.9, 1.9, 1.6), (1.7, 1.7, 2.6), (0.8, 0.8, 3.4), (1.0, 1.0, 3.9)], c, 10)
 
 
 def skiff(m, t, o):
-    """A fishing boat with one man in it."""
-    for i in range(-5, 5):
-        u = (i + 0.5) / 5
-        hw = 3.2 * (1 - abs(u) ** 2.4) ** 0.7 + 0.4
-        m.box(i * 2, -hw, -1 + abs(u) ** 2 * 2, i * 2 + 2, hw, 2.2 + abs(u) ** 2 * 2.5, o.get("hull", "wood"))
-        m.box(i * 2, -hw - 0.2, 2.2 + abs(u) ** 2 * 2.5, i * 2 + 2, hw + 0.2, 2.9 + abs(u) ** 2 * 2.5, o.get("trim", "blue"))
-    m.at(-2, 0, 1.6, s=0.7)
-    human(m, t, {"tunic": o.get("tunic", "cream"), "hat": "straw", "still": True, "arms": "work", "staff": "wood"})
+    """A fishing boat with one man in it, pulling on the oars."""
+    hull, trim = o.get("hull", "wood"), o.get("trim", "blue")
+    half, sheer = _hull(m, 20, 3.1, hull, trim, "wood2", depth=1.0, base=2.3, rise=9.0)
+    m.box(-1.2, -2.6, 2.2, 0.2, 2.6, 2.6, "wood2")     # the thwart he sits on
+    ph = math.sin(t * math.tau)
+    for sd in (1, -1):
+        m.at(0.5, sd * 3.2, 3.0, rz=sd * (ph * 26), rx=sd * 16)
+        m.limb((0, 0, 0), (0, sd * 5.6, 0), 0.26, 0.22, "wood", 6)
+        m.ball(0, sd * 6.3, 0, 0.5, 1.0, 0.18, "wood", 6)
+        m.pop()
+    m.tube(5.2, 0, 2.3, [(1.0, 1.0, 0), (1.4, 1.4, 1.1), (1.2, 1.2, 1.4)], "straw", 8)   # the basket for the catch
+    m.ball(5.2, 0, 3.6, 1.0, 1.0, 0.35, "iron", 6)
+    m.at(-1.0, 0, 2.2, s=0.66)
+    human(m, 0, dict(tunic=o.get("tunic", "cream"), hat="straw", still=True, arms="carry", legs=o.get("tunic", "cream")))
     m.pop()
-    m.box(4, -1.6, 2.2, 7, 1.6, 3.6, "straw")          # a basket of fish
-    m.box(4.4, -1.2, 3.6, 6.6, 1.2, 4.1, "iron")
 
 
 def cart(m, t, o):
@@ -626,6 +718,11 @@ UNITS = {
     "farmer_work": (human, dict(tunic="olive", hat="straw", hoe=True, arms="work", skin="skin2", still=True), 12, 8, 4),
     "shepherd": (human, dict(tunic="cloth", cloak="brown", crook=True, arms="hold", beard="hair"), 12, 8, 4),
     "hoplite": (human, HOPLITE, 12, 8, 4),
+    # the young and the old: the same figure, smaller (a child's head is big for its body) or with a stick
+    "boy": (human, dict(tunic="straw", belt="wood2", hair="hair", stride=1.3), 12, 8, 4, 0.66),
+    "girl": (human, dict(tunic="pink", long=True, longhair=True, hair="blond", belt="white"), 12, 8, 4, 0.66),
+    "elder": (human, dict(tunic="grey", long=True, cloak="brown", hair="white", beard="white", staff="wood2", arms="stick", stride=0.6), 12, 8, 4, 0.94),
+    "elder_woman": (human, dict(tunic="dark", long=True, longhair=True, hair="grey", cloak="purple", basket="cloth", arms="rightup", stride=0.6), 12, 8, 4, 0.92),
     "archer": (human, dict(tunic="green", bow=True, arms="hold", belt="wood2", hair="blond", longhair=True), 12, 8, 4),
     "priest": (human, dict(tunic="white", long=True, belt="gold", staff="gold", arms="hold", beard="grey", hair="grey"), 12, 8, 4),
     "merchant": (human, dict(tunic="purple", long=True, belt="gold", hat="red", beard="hair"), 12, 8, 4),
@@ -655,12 +752,12 @@ UNITS = {
     "griffin": (beast, dict(len=12, wide=4.2, deep=4.4, leg=4.2, legw=1.5, body="straw", legs="straw", head="white", headw=3, headl=3, headh=3.2, neck=2.4, headup=1.6, reach=1.6, beak="gold", ears="white", earh=1.4, tail="straw", taill=5, tuft="bay", tailang=40, wings="white", wings2="feather2", span=13, still=True), 12, 8, 4),
     "pegasus": (beast, {**HORSE, "body": "white", "head": "white", "ears": "white", "snout": "white", "mane": "sky", "tail": "sky", "wings": "white", "wings2": "feather", "span": 14, "hoof": "gold"}, 12, 8, 4),
     "eagle": (bird, dict(body="feather2", head="white", tail="white", tips="dark", span=9), 12, 8, 4),
-    "trireme": (ship, dict(len=60, oars=9, crew=7, shields=("bronze", "red", "white", "blue"), stripe="red", captain=HOPLITE), 6, 16, 2, 1.55),
-    "merchant_ship": (ship, dict(len=46, beam=8.5, oars=0, ram=False, hull="bay", trim="blue", sail="cream", cargo=("bronze2", "red", "bronze2", "cloth"), masth=28, captain=dict(tunic="purple", long=True)), 6, 16, 1, 1.55),
-    "merchant_ship2": (ship, dict(len=42, beam=8, oars=0, ram=False, hull="wood2", trim="teal", sail="sail", stripe="teal", cargo=("cloth", "bronze2", "green"), masth=26), 6, 16, 1, 1.55),
-    "odysseus": (ship, dict(len=54, oars=7, crew=6, trim="red", sail="sail", device="red", shields=("bronze",), captain=dict(tunic="red", cloak="blue", beard="hair", helmet="bronze")), 6, 16, 2, 1.7),
-    "argo": (ship, dict(len=58, oars=8, crew=7, hull="bay", trim="gold", sail="sky", device="gold", shields=("gold", "bronze"), captain=dict(tunic="white", cloak="purple", hair="blond")), 6, 16, 2, 1.55),
-    "theseus": (ship, dict(len=50, oars=6, crew=5, hull="dark", trim="crimson", sail="black", captain=dict(tunic="blue", hair="hair")), 6, 16, 2, 1.55),
+    "trireme": (ship, dict(len=60, oars=9, crew=7, shields=("bronze", "red", "white", "blue"), stripe="red", captain=HOPLITE), 6, 16, 2, 2.0),
+    "merchant_ship": (ship, dict(len=46, beam=8.5, oars=0, ram=False, hull="bay", trim="blue", sail="cream", cargo=("bronze2", "red", "bronze2", "cloth"), masth=28, captain=dict(tunic="purple", long=True)), 6, 16, 1, 1.9),
+    "merchant_ship2": (ship, dict(len=42, beam=8, oars=0, ram=False, hull="wood2", trim="teal", sail="sail", stripe="teal", cargo=("cloth", "bronze2", "green"), masth=26), 6, 16, 1, 1.9),
+    "odysseus": (ship, dict(len=54, oars=7, crew=6, trim="red", sail="sail", device="red", shields=("bronze",), captain=dict(tunic="red", cloak="blue", beard="hair", helmet="bronze")), 6, 16, 2, 2.1),
+    "argo": (ship, dict(len=58, oars=8, crew=7, hull="bay", trim="gold", sail="sky", device="gold", shields=("gold", "bronze"), captain=dict(tunic="white", cloak="purple", hair="blond")), 6, 16, 2, 2.0),
+    "theseus": (ship, dict(len=50, oars=6, crew=5, hull="dark", trim="crimson", sail="black", captain=dict(tunic="blue", hair="hair")), 6, 16, 2, 2.0),
     "skiff": (skiff, dict(), 12, 8, 4),
     "skiff2": (skiff, dict(hull="wood2", trim="red", tunic="olive"), 12, 8, 4),
 }

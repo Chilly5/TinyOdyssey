@@ -487,9 +487,9 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
       to(bed.wind, m.wind);
       to(bed.sea, m.sea);
       to(bed.hiss, 0.03 * shore * close);
-      to(bed.cicada, 0.02 * wild * day * (0.25 * mid + close));
-      to(bed.cricket, 0.011 * s.land * s.night * (0.3 * mid + close));
-      to(bed.rustle, 0.022 * wild * close * (0.5 + 0.5 * day));
+      to(bed.cicada, 0.034 * wild * day * (0.25 * mid + close));
+      to(bed.cricket, 0.018 * s.land * s.night * (0.3 * mid + close));
+      to(bed.rustle, 0.036 * wild * close * (0.5 + 0.5 * day));
       const tick = (name, rate, play) => { // rate: about how many a second
         if (rate <= 0.004) return;
         due[name] -= dt * rate;
@@ -498,17 +498,17 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
         play();
       };
       const down = 0.2 * mid + close; // how much of the small sounds can be made out
-      tick('bird', 1.1 * s.land * day * down, () => chirp(0.012 + 0.012 * close));
-      tick('warble', 0.4 * wild * day * close, () => warble(0.016));
-      tick('sparrow', 0.5 * s.land * day * close, () => sparrow(0.011));
+      tick('bird', 1.1 * s.land * day * down, () => chirp(0.02 + 0.016 * close));
+      tick('warble', 0.4 * wild * day * close, () => warble(0.026));
+      tick('sparrow', 0.5 * s.land * day * close, () => sparrow(0.018));
       tick('pecker', 0.12 * wild * day * close, () => pecker(0.05));
-      tick('bee', 0.22 * wild * day * close, () => bee(0.012));
-      tick('owl', 0.12 * wild * s.night * close, () => owl(0.018));
-      tick('frog', 0.5 * coast * s.night * close, () => frog(0.03));
+      tick('bee', 0.22 * wild * day * close, () => bee(0.02));
+      tick('owl', 0.12 * wild * s.night * close, () => owl(0.028));
+      tick('frog', 0.5 * coast * s.night * close, () => frog(0.04));
       tick('gull', 1.1 * coast * day * (0.25 * mid + 0.8 * close), () => gull(0.011));
       tick('wave', 0.55 * coast * close, () => wave(0.07));
       tick('hammer', 0.3 * s.town * day * close, () => hammer(0.05));
-      tick('bleat', 0.2 * wild * day * close, () => bleat(0.014));
+      tick('bleat', 0.2 * wild * day * close, () => bleat(0.022));
       tick('bell', 0.25 * wild * day * close, () => bell(0.05));
     },
   };

@@ -8,7 +8,7 @@ import { mulberry32 } from './util.js';
 
 // How each kind moves: map pixels a second, and how fast its legs (or oars) go.
 const KIND = {
-  man: [3.2, 1.3], man2: [3.0, 1.3], woman: [2.7, 1.3], woman2: [2.7, 1.3], farmer: [2.8, 1.3], shepherd: [1.5, 1.3],
+  man: [3.2, 1.3], man2: [3.0, 1.3], woman: [2.7, 1.3], woman2: [2.7, 1.3], boy: [4.2, 1.9], girl: [3.6, 1.9], elder: [1.5, 1.4], elder_woman: [1.6, 1.4], farmer: [2.8, 1.3], shepherd: [1.5, 1.3],
   hoplite: [3.0, 1.3], archer: [3.2, 1.3], priest: [2.2, 1.2], merchant: [2.6, 1.3], runner: [7.5, 0.9], bard: [1.6, 1.3],
   heracles: [3.4, 1.0], satyr: [2.4, 1.6], cyclops: [3.0, 0.5], talos: [4.2, 0.36], dancer: [1.3, 0], harpy: [9, 0],
   sheep: [1.3, 1.6], goat: [1.5, 1.6], ox: [1.3, 1.0], bull: [1.5, 1.0], horse: [5.5, 0.6], horse_white: [5.5, 0.6],
@@ -17,7 +17,7 @@ const KIND = {
   skiff: [1.4, 0], skiff2: [1.2, 0], farmer_work: [0.5, 0],
 };
 
-const HOMEBODY = new Set(['man', 'man2', 'woman', 'woman2', 'farmer', 'farmer_work', 'priest', 'merchant', 'runner', 'bard', 'rider', 'oxcart', 'chariot', 'shepherd', 'donkey', 'dancer']);
+const HOMEBODY = new Set(['man', 'man2', 'woman', 'woman2', 'boy', 'girl', 'elder', 'elder_woman', 'farmer', 'farmer_work', 'priest', 'merchant', 'runner', 'bard', 'rider', 'oxcart', 'chariot', 'shepherd', 'donkey', 'dancer']);
 
 // A path as it comes from the builder: for each point x and y in image pixels and the height of the
 // ground there (which with y says how far south the point is, and so what stands in front of it).
@@ -106,11 +106,11 @@ export function createLife(viewer, M, data, calm) {
     for (const st of t.streets) {
       const p = makePath(st);
       const n = Math.max(1, Math.min(4, Math.round(p.total / 30)));
-      for (let i = 0; i < n; i++) add(p, pick(['man', 24, 'woman', 20, 'woman2', 14, 'man2', 8, 'merchant', 8, 'priest', 5, 'farmer', 8, 'hoplite', 5, 'bard', 2, 'donkey', 4]), { side: (rnd() - 0.5) * 1.6, ctx: { where: 'street', town: t.id } });
+      for (let i = 0; i < n; i++) add(p, pick(['man', 22, 'woman', 18, 'woman2', 12, 'boy', 9, 'girl', 8, 'elder', 7, 'elder_woman', 6, 'man2', 8, 'merchant', 8, 'priest', 5, 'farmer', 8, 'hoplite', 5, 'bard', 2, 'donkey', 4]), { side: (rnd() - 0.5) * 1.6, ctx: { where: 'street', town: t.id } });
     }
     for (const loop of t.market || []) {
       const p = makePath(loop);
-      add(p, pick(['man', 3, 'woman', 3, 'woman2', 2, 'merchant', 2]), { loop: true, speed: 1.2 + rnd(), idle: 0.7, ctx: { where: 'market', town: t.id } });
+      add(p, pick(['man', 3, 'woman', 3, 'woman2', 2, 'merchant', 2, 'elder_woman', 1, 'boy', 1]), { loop: true, speed: 1.2 + rnd(), idle: 0.7, ctx: { where: 'market', town: t.id } });
       if (rnd() < 0.6) add(p, pick(['man', 3, 'woman', 3, 'priest', 1]), { loop: true, speed: 1.2 + rnd(), idle: 0.7, ctx: { where: 'market', town: t.id } });
     }
     if (t.wall) {

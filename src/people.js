@@ -44,6 +44,17 @@ const TRADES_F = [
   ['Laundress', '{He} knows the state of every household by its linen.'],
 ];
 // Family: what can be said of anyone, of the young, and of those old enough to have a household.
+// The young have no trade yet, and the old have laid theirs down.
+const YOUNG = [
+  '{He} is supposed to be minding the goats.', '{He} knows every roof in the quarter that can be climbed.', '{He} is learning letters from a tutor who falls asleep.',
+  '{He} can whistle through a blade of grass, which is the envy of the street.', '{He} is saving knucklebones in a jar and will not say how many.',
+  '{He} has been told twice today to fetch water and has not yet gone.', '{He} wants to be a ship\'s captain, or failing that a horse.',
+];
+const OLD = [
+  '{He} remembers when the harbour wall was a row of stakes.', '{He} has buried a spouse, two oxen and most of {his} arguments.', '{He} sits by the well most mornings and is consulted on everything.',
+  '{He} walks the same round each day and is put out if a stall has moved.', '{He} tells the story of the great storm differently each year, and better.',
+  '{He} gave the workshop to a son-in-law and visits it daily to see what is being done wrong.',
+];
 const KIN = [
   '{He} is the youngest of five.', '{He} has a twin whom {he} has not spoken to since the inheritance.',
   '{He} was a foundling, left at the temple steps in a good blanket.', '{He} has a brother rowing in the fleet and a sister married in the next town.',
@@ -52,6 +63,10 @@ const KIN = [
 const KIN_YOUNG = [
   '{He} lives with a grandmother who remembers the last war and brings it up.', '{He} is promised to someone in the next village and has met them twice.',
   '{He} is the first of the family to leave the farm.', '{He} still sleeps under {his} parents\' roof and is reminded of it.',
+];
+const KIN_CHILD = [
+  '{He} is the youngest of five.', '{He} has an older sister who is in charge of {him}, in theory.', '{He} lives with an aunt above the dyer\'s.',
+  '{He} has a twin, and the two of them are seldom both where they should be.', '{His} father is away with the fleet this year.',
 ];
 const KIN_GROWN = [
   '{He} has two daughters and a son who wants to go to sea.', '{He} was widowed young and did not marry again.', '{He} married across the valley, which the village still discusses.',
@@ -170,13 +185,16 @@ export function createPeople(nameOf, isTown = () => true) {
     }
 
     // --- People ---
-    const female = kind === 'woman' || kind === 'woman2' || kind === 'dancer';
+    const female = kind === 'woman' || kind === 'woman2' || kind === 'dancer' || kind === 'girl' || kind === 'elder_woman';
+    const child = kind === 'boy' || kind === 'girl', aged = kind === 'elder' || kind === 'elder_woman';
     let first = pick(female ? WOMEN : MEN);
     if (lead && lead.first === first) first = (female ? WOMEN : MEN)[((female ? WOMEN : MEN).indexOf(first) + 7) % 36]; // not the same name as whoever they are with
     const parent = pick(MEN);
-    const age = 17 + Math.floor(r() * 46);
+    const age = child ? 6 + Math.floor(r() * 8) : aged ? 63 + Math.floor(r() * 22) : 17 + Math.floor(r() * 46);
     let trade, habit, goods = null;
-    if (kind === 'man' || kind === 'man2' || kind === 'woman' || kind === 'woman2') [trade, habit] = pick(female ? TRADES_F : TRADES_M);
+    if (child) [trade, habit] = [female ? 'Girl' : 'Boy', pick(YOUNG)];
+    else if (aged) [trade, habit] = [`Once a ${pick(female ? TRADES_F : TRADES_M)[0].toLowerCase()}`, pick(OLD)];
+    else if (kind === 'man' || kind === 'man2' || kind === 'woman' || kind === 'woman2') [trade, habit] = pick(female ? TRADES_F : TRADES_M);
     else if (kind === 'farmer' || kind === 'farmer_work') [trade, habit] = ['Farmer', `{He} works ${pick(['nine', 'twelve', 'fifteen', 'six'])} strips of ${pick(CROPS)} and a row of olives older than the town.`];
     else if (kind === 'shepherd') [trade, habit] = [pick(['Shepherd', 'Goatherd']), '{He} spends the summer on the high pastures and comes down in autumn smelling of thyme and smoke.'];
     else if (kind === 'hoplite') [trade, habit] = ['Hoplite', `{He} carries a shield that was {his} father's, ${pick(['with a new strap', 'dented at Tegea', 'repainted every spring'])}.`];
@@ -196,12 +214,12 @@ export function createPeople(nameOf, isTown = () => true) {
     const homeId = c.where === 'road' ? (ends.length ? ends[Math.floor(r() * ends.length)] : null) : c.town;
     const title = c.where === 'road' && !homeId ? `${trade} from the country near ${place(c.to)}, ${age}` : `${trade} of ${homeId ? place(homeId) : 'these parts'}, ${age}`;
     const local = LOCAL[homeId] || null;
-    const kin = r() < 0.4 ? KIN : age < 27 ? KIN_YOUNG : KIN_GROWN;
+    const kin = child ? KIN_CHILD : r() < 0.4 ? KIN : age < 27 ? KIN_YOUNG : KIN_GROWN;
     const life = [
       `${first}, ${female ? 'daughter' : 'son'} of ${parent}. ${say(pick(kin), female)}`,
       say(habit, female),
       say(local && r() < 0.8 ? pick(local) : pick(ANYWHERE), female),
-      say(pick(HOPES), female),
+      say(child ? pick(['{He} would like a dog.', '{He} has never seen the sea from a ship and means to.', '{He} is quite sure there is a monster in the cistern.', '{He} is hoping nobody counts the figs.']) : pick(HOPES), female),
     ];
 
     // What they are doing, which depends on where their path lies and who they are with.
@@ -229,6 +247,8 @@ export function createPeople(nameOf, isTown = () => true) {
     else if (c.where === 'boat') doing = `Fishing off ${town}. The nets come up at dusk.`;
     else if (c.where === 'sea') doing = 'Fishing in open water, a long row from anywhere.';
     else if (c.where === 'myth') doing = kind === 'runner' ? 'Running the length of the stadium, again, with the others.' : kind === 'hoplite' ? 'Drilling in the square: left turn, right turn, lock shields.' : kind === 'bard' ? 'Singing to anyone who will stop.' : 'About their own business.';
+    else if (child) doing = `Out in ${town || 'the street'}, ${pick(['running an errand the long way round', 'chasing a hoop', 'late for a lesson', 'following the soldiers at a safe distance', 'carrying a message and trying to remember it'])}.`;
+    else if (aged) doing = `Out in ${town || 'the street'}, ${pick(['taking the air, slowly', 'on the way to the bench by the fountain', 'going to see what the mason is doing wrong', 'looking for someone to tell about the old days'])}.`;
     else doing = `Out in ${town || 'the street'} ${pick(ERRANDS)}.`;
     const night = c.where === 'wall' ? `On the night watch, walking the wall of ${town} with a torch.` : c.where === 'sea' || c.where === 'boat' ? 'Night fishing, with a lamp in the bow to bring the fish up.' : 'Out late, and walking a little faster for it.';
     const dusk = `Heading home before the lamps are lit. Earlier: ${doing[0].toLowerCase()}${doing.slice(1)}`;
