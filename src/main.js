@@ -7,6 +7,7 @@ import { createPeople } from './people.js';
 import { SITES, KINDS, VOYAGE } from './sites.js';
 import { lonLatToWorld } from './config.js';
 import { clamp } from './util.js';
+import { track, startTracking } from './track.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
@@ -192,7 +193,10 @@ async function boot() {
   }
   // Asleep: on, but the browser has not let it start yet. A press of the button or of M then wakes it
   // (the press is what the browser was waiting for) and does not turn it off.
-  const toggleSound = () => setSound(sound.on && !sound.awake ? true : !sound.on);
+  const toggleSound = () => {
+    setSound(sound.on && !sound.awake ? true : !sound.on);
+    track('sound_toggled', { on: sound.on });
+  };
   sound.onstate = showSound;
   function setTime(mode) {
     timeMode = mode;
@@ -213,7 +217,10 @@ async function boot() {
     try { localStorage.setItem('tiny.style', name); } catch { /* fine */ }
     nameStyle(name);
   }
-  const nextStyle = () => setStyle(viewer.styles[(viewer.styles.indexOf(viewer.style) + 1) % viewer.styles.length]);
+  const nextStyle = () => {
+    setStyle(viewer.styles[(viewer.styles.indexOf(viewer.style) + 1) % viewer.styles.length]);
+    track('style_changed', { style: viewer.style });
+  };
   if (btnStyle) {
     if (viewer.styles.length < 2) btnStyle.hidden = true;
     btnStyle.addEventListener('click', nextStyle);
@@ -234,7 +241,11 @@ async function boot() {
     };
     for (const n of firsts) addEventListener(n, wake, true);
   }
-  btnTime?.addEventListener('click', () => setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]));
+  const nextTime = () => {
+    setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]);
+    track('time_changed', { time: timeMode });
+  };
+  btnTime?.addEventListener('click', nextTime);
   setTime(timeMode);
 
   // ---------------------------------------------------------------- camera --
@@ -260,7 +271,11 @@ async function boot() {
   const liftFor = (px, zoom) => px / 2 / zoom;
 
   // ----------------------------------------------------------------- labels --
-  const labels = createLabels($('labels'), viewer, (id) => (siteById[id] ? select(id) : follow(id)));
+  const labels = createLabels($('labels'), viewer, (id) => {
+    if (siteById[id]) return select(id, { via: 'name' });
+    follow(id);
+    track('followed', { what: id, via: 'name' });
+  });
   for (const s of SITES) {
     const q = place[s.id];
     if (!q || s.hidden) continue;
@@ -291,8 +306,13 @@ async function boot() {
   side.addEventListener('click', (e) => {
     if (e.target.closest('[data-close]')) openSheet(null);
   });
-  $('btnAtlas').addEventListener('click', () => openSheet(sheets.atlas.hidden ? 'atlas' : null));
-  $('btnAbout').addEventListener('click', () => openSheet(sheets.about.hidden ? 'about' : null));
+  for (const [btn, name] of [['btnAtlas', 'atlas'], ['btnAbout', 'about']]) {
+    $(btn).addEventListener('click', () => {
+      const open = sheets[name].hidden;
+      openSheet(open ? name : null);
+      if (open) track('panel_opened', { panel: name });
+    });
+  }
 
   const atlasBody = $('atlasBody');
   for (const [kind, info] of Object.entries(KINDS)) {
@@ -308,7 +328,7 @@ async function boot() {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = s.name;
-      b.addEventListener('click', () => select(s.id));
+      b.addEventListener('click', () => select(s.id, { via: 'atlas' }));
       li.append(b);
       ul.append(li);
     }
@@ -346,6 +366,7 @@ async function boot() {
     selected = id;
     labels.select(id);
     setHash(id);
+    track('place_opened', { place: id, name: s.name, kind: s.kind, minor: !!s.minor, via: opts.via || 'other' });
     if (!opts.still) {
       // Close enough to see the model, but never so close that it overflows the screen.
       const fit = Math.min(viewer.cssW, viewer.cssH) / Math.max(s.minor ? 110 : 180, q.r * 2.6);
@@ -384,6 +405,7 @@ async function boot() {
     follow(null, { name: p.name, target: m, dy: 0 });
     people.watch(m);
     met = { m, p, shown: null };
+    track('person_met', { kind: m.kind, where: (m.ctx && m.ctx.where) || null, town: (m.ctx && m.ctx.town) || null });
     $('whoName').textContent = p.name;
     $('whoTitle').textContent = p.title;
     $('whoLife').textContent = p.life;
@@ -416,6 +438,7 @@ async function boot() {
     voyage.goTo(i);
     voyage.showTrail(i);
     const v = VOYAGE[i];
+    track(i === VOYAGE.length - 1 ? 'voyage_finished' : 'voyage_stop', { stop: i + 1, title: v.title });
     $('vStep').textContent = `The Odyssey · ${i + 1} of ${VOYAGE.length} · ${v.book}`;
     $('vTitle').textContent = v.title;
     $('vText').textContent = v.text;
@@ -433,11 +456,13 @@ async function boot() {
     openSheet(null);
     unfollow();
     voyage.goTo(i, true);
+    track('voyage_started', { stop: i + 1 });
     showStop(i);
     setHash('odyssey');
     $('btnVoyage').hidden = true;
   }
   function leaveVoyage() {
+    track('voyage_left', { stop: voyage.stop + 1 });
     document.body.classList.remove('voyaging');
     vEl.hidden = true;
     voyage.release();
@@ -530,7 +555,7 @@ async function boot() {
       };
       for (const sh of actors.ships) near(sh, sh.id, 3);
       for (const id of Object.keys(roaming)) near(roaming[id], id, 2);
-      if (pick) { follow(pick[0], pick[1]); return; }
+      if (pick) { follow(pick[0], pick[1]); track('followed', { what: pick[0], via: 'map' }); return; }
     }
     if (people && viewer.zoom >= 1.5) { // close enough to tell one person from the next
       const b = viewer.bounds();
@@ -547,7 +572,7 @@ async function boot() {
       const reach = Math.max(30, q.r * viewer.zoom * 0.6);
       if (d < reach && d / reach < bd) { bd = d / reach; best = q; }
     }
-    if (best) select(best.id);
+    if (best) select(best.id, { via: 'map' });
     else if (!sheets.card.hidden) openSheet(null);
   }
 
@@ -564,6 +589,11 @@ async function boot() {
   $('zoomOut').addEventListener('click', () => zoomBy(1 / 1.6));
   $('zoomFit')?.addEventListener('click', () => { unfollow(); flyTo(M.w / 2, M.h / 2, viewer.minZoom, 3); });
 
+  // The first thing a visitor does with the map (many do nothing), counted once.
+  let touched = false;
+  const first = (how) => { if (!touched) { touched = true; track('first_interaction', { how }); } };
+  canvas.addEventListener('pointerdown', (e) => first(e.pointerType === 'touch' ? 'touch' : 'drag'));
+  canvas.addEventListener('wheel', () => first('wheel'), { passive: true });
   const held = new Set();
   window.addEventListener('keydown', (e) => {
     if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -576,7 +606,7 @@ async function boot() {
     else if (voyaging && e.key === 'ArrowLeft') showStop(voyage.stop - 1);
     else if (e.key === 'v' || e.key === 'V') nextStyle();
     else if (e.key === 'm' || e.key === 'M') toggleSound();
-    else if (e.key === 'n' || e.key === 'N') setTime(TIMES[(TIMES.indexOf(timeMode) + 1) % TIMES.length]);
+    else if (e.key === 'n' || e.key === 'N') nextTime();
     else if (e.key === 'p' || e.key === 'P') {
       viewer.setPixel(viewer.pixel ? 0 : 2);
       goal.zoom = Math.min(goal.zoom, viewer.maxZoom);
@@ -584,6 +614,7 @@ async function boot() {
     else if (e.key === '-' || e.key === '_') zoomBy(1 / 1.5);
     else if (/^Arrow|^[wasd]$/i.test(e.key) && !e.metaKey && !e.ctrlKey && document.activeElement === document.body) {
       held.add(e.key.toLowerCase());
+      first('keys');
       e.preventDefault();
     }
   });
@@ -600,7 +631,7 @@ async function boot() {
     const h = (location.hash || '').slice(1);
     if (h === 'odyssey') {
       if (!document.body.classList.contains('voyaging')) startVoyage(0);
-    } else if (siteById[h] && h !== selected) select(h);
+    } else if (siteById[h] && h !== selected) select(h, { via: 'link' });
   }
   window.addEventListener('hashchange', fromHash);
 
@@ -609,6 +640,8 @@ async function boot() {
   let clock = 0;
   let last = performance.now();
   let started = false;
+  const DEPTHS = [2, 4, 8, 16, 32];
+  let depth = 0;
   let shownPct = '';
   function frame(now) {
     const dt = clamp((now - last) / 1000, 0, 0.1); // the first timestamp can predate `last`
@@ -684,9 +717,12 @@ async function boot() {
       const pct = `${Math.round((viewer.zoom / viewer.base) * 100)}%`;
       if (pct !== shownPct) readout.textContent = shownPct = pct;
     }
+    // How far in they go, each mark counted once: 2 is a region, 8 a street, 32 a doorway.
+    if (depth < DEPTHS.length && viewer.zoom >= DEPTHS[depth]) track('zoom_reached', { zoom: DEPTHS[depth++] });
     if (!started) {
       started = true;
       $('loading').classList.add('gone');
+      startTracking({ style: viewer.style, screen: narrow.matches ? 'phone' : 'wide', entry: (location.hash || '').slice(1) || 'none' });
       fromHash();
     }
     requestAnimationFrame(frame);
