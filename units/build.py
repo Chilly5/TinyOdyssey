@@ -10,8 +10,9 @@ register with the map's when it is shown in hard pixels). Each figure is outline
 own colours and its mid-tones are lifted to stand in the map's sunlight; --rim dark gives one dark line all
 round instead, and --lift 1 leaves the tones as rendered.
 
-Every unit is a small voxel model built here from boxes, a quarter of a map
-voxel to the cube, and posed for each frame of its walk. Blender renders it
+Every unit is a small model built here, measured in cubes of about a third of a map
+voxel, and posed for each frame of its walk. People and animals are made of round
+shapes (limbs, balls, flared tubes: Model.limb, .ball, .tube); ships and carts of boxes. Blender renders it
 through the map's own camera (looking north and down, so ground depth is
 squeezed to 0.6 and height to 0.8) from each compass heading, with hard pixels
 and a soft outline, and the frames are packed into sprite sheets:
@@ -45,7 +46,8 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 arg = lambda name, dflt=None: argv[argv.index(name) + 1] if name in argv else dflt
 
 RIM = arg("--rim", "self")              # self | dark | none
-LIFT = float(arg("--lift", "0.72"))     # below 1 brightens the mid-tones; 1 leaves the render as it comes
+LIFT = float(arg("--lift", "0.82"))     # below 1 brightens the mid-tones; 1 leaves the render as it comes
+BIG = "--big" in argv                    # also render the people and animals at twice the grid, for the closest zoom
 
 # ------------------------------------------------------------------ colours --
 C = dict(
@@ -83,6 +85,7 @@ class Model:
 
     def __init__(self):
         self.verts, self.faces, self.cols = [], [], []
+        self.smooth = set()   # the faces that belong to a curved surface, to be shaded as one
         self.stack = [Matrix.Identity(4)]
 
     def push(self, m):
@@ -121,6 +124,73 @@ class Model:
         """A box by the middle of its base and its size."""
         return self.box(x - sx / 2, y - sy / 2, z, x + sx / 2, y + sy / 2, z + sz, col)
 
+    def _round(self, pts, faces, col):
+        k = len(self.faces)
+        self._add(pts, faces, col)
+        self.smooth.update(range(k, len(self.faces)))
+
+    def ball(self, x, y, z, rx, ry, rz, col, n=10):
+        """A ball, or an egg: its middle and its three radii."""
+        rings = max(4, n // 2 + 1)
+        pts = [(x, y, z - rz)]
+        for j in range(1, rings):
+            t = math.pi * j / rings
+            for i in range(n):
+                a = math.tau * i / n
+                pts.append((x + math.sin(t) * math.cos(a) * rx, y + math.sin(t) * math.sin(a) * ry, z - math.cos(t) * rz))
+        pts.append((x, y, z + rz))
+        top = len(pts) - 1
+        faces = []
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append((0, 1 + j, 1 + i))
+            faces.append((top, top - n + i, top - n + j))
+        for r in range(rings - 2):
+            a0, b0 = 1 + r * n, 1 + (r + 1) * n
+            for i in range(n):
+                j = (i + 1) % n
+                faces.append((a0 + i, a0 + j, b0 + j, b0 + i))
+        self._round(pts, faces, col)
+        return self
+
+    def limb(self, p0, p1, r0, r1, col, n=8, caps=True):
+        """A round bar from p0 to p1, r0 thick at p0 and r1 at p1, its ends rounded off."""
+        a, b = Vector(p0), Vector(p1)
+        d = b - a
+        if d.length < 1e-6:
+            return self.ball(p0[0], p0[1], p0[2], r0, r0, r0, col, n)
+        d.normalize()
+        u = d.orthogonal().normalized()
+        v = d.cross(u)
+        pts = []
+        for p, r in ((a, r0), (b, r1)):
+            for i in range(n):
+                t = math.tau * i / n
+                pts.append(tuple(p + (u * math.cos(t) + v * math.sin(t)) * r))
+        self._round(pts, [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)], col)
+        if caps:
+            if r0 > 0.05:
+                self.ball(p0[0], p0[1], p0[2], r0, r0, r0, col, n)
+            if r1 > 0.05:
+                self.ball(p1[0], p1[1], p1[2], r1, r1, r1, col, n)
+        return self
+
+    def tube(self, x, y, z, rings, col, n=12):
+        """A stack of ovals about the upright through (x, y): rings is [(rx, ry, height), ...] from the
+        bottom up. A robe, a torso, a jar. Closed flat at both ends."""
+        ring = lambda rx, ry, h: [(x + math.cos(math.tau * (i + 0.5) / n) * rx, y + math.sin(math.tau * (i + 0.5) / n) * ry, z + h) for i in range(n)]
+        pts = [p for r in rings for p in ring(*r)]
+        faces = []
+        for r in range(len(rings) - 1):
+            a0, b0 = r * n, (r + 1) * n
+            for i in range(n):
+                j = (i + 1) % n
+                faces.append((a0 + i, a0 + j, b0 + j, b0 + i))
+        self._round(pts, faces, col)
+        self._add(ring(*rings[0]), [tuple(range(n - 1, -1, -1))], col)
+        self._add(ring(*rings[-1]), [tuple(range(n))], col)
+        return self
+
     def prism(self, x, y, z, r0, r1, h, col, n=8, axis="Z"):
         """A many-sided column (or cone) standing on (x, y, z); axis Y lays it on its side as a disc."""
         pts, faces = [], []
@@ -143,7 +213,8 @@ class Model:
 
 # -------------------------------------------------------------------- people --
 def human(m, t, o):
-    """A person about 16 cubes tall, facing +x. t is the place in the stride, 0..1."""
+    """A person about 16 cubes tall, facing +x. t is the place in the stride, 0..1.
+    Round-limbed: legs with a knee, a robe or a tunic that flares, a head with a face and hair."""
     walk = o.get("still", False) is False
     sw = math.sin(t * math.tau) * (30 if walk else 0) * o.get("stride", 1)
     bob = (abs(math.cos(t * math.tau)) * 0.5 if walk else 0) + o.get("lift", 0)
@@ -151,24 +222,27 @@ def human(m, t, o):
     legs = o.get("legs", skin)
     long_ = o.get("long", False)     # a robe to the ankles
     m.at(0, 0, bob)
-    # legs
+    # legs: a thigh, a shin that trails as the leg goes back, a foot
     for side, a in ((1, sw), (-1, -sw)):
-        m.at(0, side * 1.25, 6, ry=-a if not long_ else -a * 0.4)
-        m.box(-1, -1, -6, 1, 1, 0, legs)
-        m.box(-1, -1, -6, 1.6, 1, -5, o.get("shoes", "wood2"))
+        m.at(0, side * 1.25, 6.2, ry=-a if not long_ else -a * 0.4)
+        knee = max(0.0, -a) * 0.03
+        m.limb((0, 0, 0), (0.3 + knee, 0, -3.0), 1.05, 0.9, legs)
+        m.limb((0.3 + knee, 0, -3.0), (-knee * 1.6, 0, -5.45), 0.9, 0.72, legs)
+        m.ball(0.55 - knee * 1.6, 0, -5.55, 1.3, 0.85, 0.6, o.get("shoes", "wood2"))
         m.pop()
     # body
     if long_:
-        m.box(-1.8, -2.7, 1, 1.8, 2.7, 7, tunic)
+        m.tube(0, 0, 0, [(2.05, 2.95, 0.9), (1.9, 2.8, 4.0), (1.65, 2.5, 7.2)], tunic)
     else:
-        m.box(-1.7, -2.6, 4.2, 1.7, 2.6, 7, tunic)
-    m.box(-1.5, -2.5, 7, 1.5, 2.5, 11.2, o.get("chest", tunic))
+        m.tube(0, 0, 0, [(2.0, 2.95, 4.0), (1.65, 2.55, 7.2)], tunic)
+    chest = o.get("chest", tunic)
+    m.tube(0, 0, 0, [(1.6, 2.45, 6.9), (1.78, 2.72, 9.6), (1.62, 2.62, 10.7), (0.9, 1.3, 11.5)], chest)
     if o.get("belt"):
-        m.box(-1.6, -2.6, 6.8, 1.6, 2.6, 7.6, o["belt"])
+        m.tube(0, 0, 0, [(1.76, 2.66, 6.75), (1.76, 2.66, 7.55)], o["belt"])
     if o.get("cloak"):
-        m.box(-2.3, -2.6, 3.5, -1.5, 2.6, 11.4, o["cloak"])
+        m.ball(-1.75, 0, 7.4, 0.9, 2.75, 4.1, o["cloak"])
     if o.get("pack"):
-        m.box(-3.4, -1.8, 6.5, -1.5, 1.8, 10.5, o["pack"])
+        m.ball(-2.5, 0, 8.4, 1.15, 1.8, 2.0, o["pack"])
     # arms
     pose = o.get("arms", "swing")
     for side, a in ((1, -sw), (-1, sw)):
@@ -179,77 +253,89 @@ def human(m, t, o):
             ang = 70
         elif pose == "work":
             ang = 95 + math.sin(t * math.tau) * 55
-        m.at(0, side * 3.3, 10.8, ry=-ang)
-        m.box(-0.8, -0.8, -5, 0.8, 0.8, 0, o.get("sleeve", skin))
-        m.box(-0.8, -0.8, -5.6, 0.8, 0.8, -4.6, skin)
+        m.at(0, side * 3.3, 10.6, ry=-ang)
+        sleeve = o.get("sleeve", skin)
+        m.limb((0, 0, 0), (0, 0, -2.6), 0.88, 0.74, sleeve)
+        m.limb((0, 0, -2.6), (0.3, 0, -4.8), 0.74, 0.62, sleeve)
+        m.ball(0.3, 0, -5.3, 0.74, 0.74, 0.8, skin)
         if side == -1:   # the right hand holds things
             if o.get("spear"):
-                m.box(0.3, -0.35, -7, 1.0, 0.35, 9, "wood2")
-                m.box(0.1, -0.5, 9, 1.2, 0.5, 11.5, "iron")
+                m.limb((0.65, 0, -7), (0.65, 0, 9), 0.34, 0.3, "wood2", 6)
+                m.prism(0.65, 0, 9, 0.62, 0.0, 2.7, "iron", 6)
             if o.get("staff"):
-                m.box(0.3, -0.35, -10.5 if pose != "work" else -3, 1.0, 0.35, 8, o["staff"])
+                m.limb((0.65, 0, -10.5 if pose != "work" else -3), (0.65, 0, 8), 0.36, 0.32, o["staff"], 6)
+                m.ball(0.65, 0, 8.3, 0.6, 0.6, 0.6, o["staff"], 8)
             if o.get("crook"):
-                m.box(0.3, -0.35, -10.5, 1.0, 0.35, 8, "wood")
-                m.box(0.3, -0.35, 7.3, 2.6, 0.35, 8, "wood")
-                m.box(1.9, -0.35, 6, 2.6, 0.35, 8, "wood")
+                m.limb((0.65, 0, -10.5), (0.65, 0, 7.6), 0.36, 0.32, "wood", 6)
+                m.limb((0.65, 0, 7.6), (1.5, 0, 8.6), 0.32, 0.3, "wood", 6)
+                m.limb((1.5, 0, 8.6), (2.4, 0, 7.9), 0.3, 0.28, "wood", 6)
+                m.limb((2.4, 0, 7.9), (2.3, 0, 6.6), 0.28, 0.22, "wood", 6)
             if o.get("hoe"):
-                m.box(-0.3, -0.35, -5.4, 9, 0.35, -4.7, "wood")
+                m.limb((-0.3, 0, -5.05), (9, 0, -5.05), 0.34, 0.3, "wood", 6)
                 m.box(8.2, -1.2, -7.2, 9, 1.2, -4.7, "iron")
             if o.get("club"):
-                m.box(-0.6, -0.6, -5.6, 0.6, 0.6, 0.5, "wood2")
-                m.box(-1.1, -1.1, -11, 1.1, 1.1, -5.6, "wood")
+                m.limb((0, 0, 0.5), (0, 0, -5.6), 0.6, 0.62, "wood2", 6)
+                m.limb((0, 0, -5.6), (0, 0, -10.8), 0.8, 1.3, "wood", 8)
             if o.get("bow"):
                 for k in range(-4, 5):
                     m.box(1.2 + (16 - k * k) * 0.09, -0.3, -5 + k * 1.3 - 0.7, 1.9 + (16 - k * k) * 0.09, 0.3, -5 + k * 1.3 + 0.7, "wood")
             if o.get("lyre"):
-                m.box(0.2, -0.5, -7.4, 2.8, 0.5, -6.6, "gold")
-                m.box(0.2, -0.5, -6.6, 0.8, 0.5, -3.4, "gold")
-                m.box(2.2, -0.5, -6.6, 2.8, 0.5, -3.4, "gold")
+                m.ball(1.5, 0, -7.0, 1.4, 0.55, 0.6, "gold", 8)
+                m.limb((0.5, 0, -6.6), (0.3, 0, -3.4), 0.3, 0.24, "gold", 6)
+                m.limb((2.5, 0, -6.6), (2.7, 0, -3.4), 0.3, 0.24, "gold", 6)
+                m.limb((0.2, 0, -3.5), (2.8, 0, -3.5), 0.22, 0.22, "gold", 6)
             if o.get("sword"):
                 m.box(0.3, -0.25, -5.4, 6.5, 0.25, -4.6, "iron")
         elif o.get("shield"):
-            m.prism(0, 0.9, -3.4, 3.4, 3.4, 0.8, o["shield"], 8, "Y")
-            m.prism(0, 1.6, -3.4, 1.2, 1.2, 0.5, o.get("boss", "gold"), 8, "Y")
+            m.prism(0, 0.9, -3.4, 3.4, 3.1, 0.8, o["shield"], 14, "Y")
+            m.prism(0, 1.6, -3.4, 1.2, 0.8, 0.6, o.get("boss", "gold"), 10, "Y")
         m.pop()
     # head
-    hz = 11.2
-    m.box(-1.9, -1.9, hz, 1.9, 1.9, hz + 3.9, skin)
-    m.box(1.9, 0.5, hz + 1.9, 2.02, 1.3, hz + 2.7, "eye")
-    m.box(1.9, -1.3, hz + 1.9, 2.02, -0.5, hz + 2.7, "eye")
+    hz = 11.3
+    m.limb((0, 0, hz - 0.5), (0, 0, hz + 0.4), 0.8, 0.8, skin, 8, False)
+    m.ball(0, 0, hz + 1.95, 1.95, 1.95, 2.0, skin, 12)
+    if not o.get("eye1"):
+        for sd in (1, -1):
+            m.ball(1.74, sd * 0.85, hz + 2.2, 0.3, 0.36, 0.42, "eye", 6)
     hair = o.get("hair", "hair")
-    if hair:
-        m.box(-2.2, -2.2, hz + 3.2, 2.0, 2.2, hz + 4.5, hair)
-        m.box(-2.4, -2.2, hz + (0.2 if o.get("longhair") else 1.6), -1.2, 2.2, hz + 4.5, hair)
+    if hair and not o.get("helmet"):
+        m.ball(-0.28, 0, hz + 2.5, 2.1, 2.12, 1.9, hair, 12)
+        if o.get("longhair"):
+            m.ball(-1.45, 0, hz + 0.7, 1.05, 1.9, 1.9, hair, 10)
     if o.get("beard"):
-        m.box(1.4, -1.5, hz - 0.6, 2.3, 1.5, hz + 1.3, o["beard"])
+        m.ball(1.45, 0, hz + 0.35, 0.8, 1.3, 1.05, o["beard"], 8)
     if o.get("helmet"):
-        m.box(-2.3, -2.3, hz + 1.6, 2.3, 2.3, hz + 4.6, o["helmet"])
-        m.box(1.9, -0.5, hz + 0.4, 2.4, 0.5, hz + 2.2, o["helmet"])
-        if o.get("crest"):
-            m.box(-2.9, -0.5, hz + 4.6, 2.2, 0.5, hz + 6.6, o["crest"])
+        m.ball(-0.1, 0, hz + 2.55, 2.3, 2.3, 2.15, o["helmet"], 12)
+        m.box(1.8, -0.4, hz + 0.5, 2.35, 0.4, hz + 2.3, o["helmet"])           # the nose guard
+        for sd in (1, -1):
+            m.box(0.6, sd * 1.9 - 0.3, hz + 0.2, 2.0, sd * 1.9 + 0.3, hz + 1.8, o["helmet"])   # the cheek pieces
+        if o.get("crest"):   # a plume arching from the brow to the nape
+            for k in range(8):
+                a = math.radians(35 + k * 22)
+                m.cube(math.cos(a) * 2.75 - 0.1, 0, hz + 2.3 + math.sin(a) * 2.6, 1.25, 0.9, 1.5 + math.sin(a) * 0.5, o["crest"])
     if o.get("hat"):
-        m.prism(0, 0, hz + 3.9, 4.2, 4.2, 0.6, o["hat"], 8)
-        m.prism(0, 0, hz + 4.5, 2, 1.4, 1.5, o["hat"], 8)
+        m.prism(0, 0, hz + 3.75, 4.3, 4.1, 0.5, o["hat"], 14)
+        m.tube(0, 0, hz + 4.2, [(2.0, 2.0, 0), (1.6, 1.6, 1.0), (0.9, 0.9, 1.6)], o["hat"], 10)
     if o.get("crown"):
-        m.box(-2.1, -2.1, hz + 3.9, 2.1, 2.1, hz + 4.7, o["crown"])
-        for a, b in ((1.5, 1.5), (1.5, -1.5), (-1.5, 1.5), (-1.5, -1.5)):
-            m.box(a - 0.5, b - 0.5, hz + 4.7, a + 0.5, b + 0.5, hz + 5.6, o["crown"])
+        m.tube(0, 0, hz + 3.3, [(1.95, 1.95, 0), (1.95, 1.95, 0.7)], o["crown"], 12)
+        for k in range(8):
+            a = math.tau * k / 8
+            m.prism(math.cos(a) * 1.75, math.sin(a) * 1.75, hz + 3.9, 0.45, 0.0, 1.2, o["crown"], 5)
     if o.get("horns"):
         for sd in (1, -1):
-            m.box(0.2, sd * 1.4 - 0.4, hz + 3.9, 1.0, sd * 1.4 + 0.4, hz + 5.9, o["horns"])
+            m.limb((0.5, sd * 1.3, hz + 3.5), (0.9, sd * 2.0, hz + 4.9), 0.45, 0.3, o["horns"], 6)
+            m.limb((0.9, sd * 2.0, hz + 4.9), (1.5, sd * 1.8, hz + 5.9), 0.3, 0.08, o["horns"], 6)
     if o.get("eye1"):   # a Cyclops: one eye in the middle
-        m.box(1.9, -1.4, hz + 1.6, 2.08, 1.4, hz + 3.0, "white")
-        m.box(2.0, -0.6, hz + 1.9, 2.14, 0.6, hz + 2.8, "eye")
+        m.ball(1.6, 0, hz + 2.3, 0.6, 1.1, 0.8, "white", 8)
+        m.ball(1.95, 0, hz + 2.3, 0.3, 0.5, 0.5, "eye", 6)
     if o.get("jar"):    # carried on the head
-        m.prism(0, 0, hz + 4.5, 1.2, 2.2, 2.2, o["jar"], 8)
-        m.prism(0, 0, hz + 6.7, 2.2, 1.2, 2.0, o["jar"], 8)
-        m.prism(0, 0, hz + 8.7, 1.3, 1.5, 0.8, o["jar"], 8)
+        m.tube(0, 0, hz + 4.4, [(1.2, 1.2, 0), (2.2, 2.2, 2.2), (2.1, 2.1, 3.2), (1.2, 1.2, 4.2), (1.5, 1.5, 5.0)], o["jar"], 10)
     if o.get("basket"):
-        m.prism(0, 0, hz + 4.5, 2.4, 3.1, 2.2, "straw", 8)
-        m.prism(0, 0, hz + 6.4, 2.6, 2.2, 1.0, o["basket"], 8)
+        m.tube(0, 0, hz + 4.4, [(2.4, 2.4, 0), (3.1, 3.1, 2.2)], "straw", 12)
+        m.ball(0, 0, hz + 6.6, 2.5, 2.5, 1.0, o["basket"], 10)
     if o.get("tail"):
-        m.box(-3.2, -0.5, 6.2, -1.6, 0.5, 7.2, o["tail"])
-        m.box(-3.6, -0.5, 6.8, -2.8, 0.5, 9.2, o["tail"])
+        m.limb((-1.6, 0, 6.7), (-3.2, 0, 7.0), 0.5, 0.42, o["tail"], 6)
+        m.limb((-3.2, 0, 7.0), (-3.4, 0, 9.1), 0.42, 0.3, o["tail"], 6)
     if o.get("wings"):
         fl = math.sin(t * math.tau) * 35
         for sd in (1, -1):
@@ -262,7 +348,8 @@ def human(m, t, o):
 
 # ------------------------------------------------------------------- animals --
 def beast(m, t, o):
-    """A four-legged animal facing +x. Sizes in cubes."""
+    """A four-legged animal facing +x. Sizes in cubes. A barrel of a body, a chest and a rump, legs with
+    a joint, a neck, a head with a muzzle."""
     L, W, H, lh = o.get("len", 10), o.get("wide", 4), o.get("deep", 4), o.get("leg", 4)
     body, legc = o.get("body", "fleece"), o.get("legs", o.get("body", "fleece"))
     walk = not o.get("still")
@@ -270,20 +357,28 @@ def beast(m, t, o):
     bob = abs(math.cos(t * math.tau)) * 0.4 if walk else 0
     m.at(0, 0, bob)
     lt = o.get("legw", 1.4)
-    for fx, sd, a in ((L / 2 - 1.4, 1, sw), (L / 2 - 1.4, -1, -sw), (-L / 2 + 1.4, 1, -sw), (-L / 2 + 1.4, -1, sw)):
-        m.at(fx, sd * (W / 2 - lt / 2), lh, ry=-a)
-        m.box(-lt / 2, -lt / 2, -lh, lt / 2, lt / 2, 0.5, legc)
-        if o.get("hoof"):
-            m.box(-lt / 2, -lt / 2, -lh, lt / 2 + 0.2, lt / 2, -lh + 1, o["hoof"])
+    for fx, sd, a in ((L / 2 - 1.5, 1, sw), (L / 2 - 1.5, -1, -sw), (-L / 2 + 1.5, 1, -sw), (-L / 2 + 1.5, -1, sw)):
+        m.at(fx, sd * (W / 2 - lt * 0.62), lh + 0.4, ry=-a)
+        back = -0.35 if fx < 0 else 0.25
+        m.limb((0, 0, 0.4), (back, 0, -lh * 0.5), lt * 0.62, lt * 0.42, legc, 7)
+        m.limb((back, 0, -lh * 0.5), (0, 0, -lh - 0.05), lt * 0.42, lt * 0.36, legc, 7)
+        m.ball(0.15, 0, -lh, lt * 0.5, lt * 0.44, 0.42, o.get("hoof", legc), 7)
         m.pop()
-    m.box(-L / 2, -W / 2, lh, L / 2, W / 2, lh + H, body)
+    cz = lh + H / 2
+    m.ball(0, 0, cz, L / 2 * 0.98, W / 2 * 1.02, H / 2 * 1.04, body, 12)
+    m.ball(L * 0.24, 0, cz + H * 0.03, L * 0.27, W / 2 * 1.06, H / 2 * 1.1, body, 10)
+    m.ball(-L * 0.25, 0, cz + H * 0.02, L * 0.26, W / 2 * 1.04, H / 2 * 1.07, body, 10)
     if o.get("wool"):
-        m.box(-L / 2 - 0.5, -W / 2 - 0.5, lh + 0.6, L / 2 + 0.3, W / 2 + 0.5, lh + H + 0.6, o["wool"])
+        m.ball(-0.1, 0, cz + 0.45, L / 2 + 0.45, W / 2 + 0.55, H / 2 + 0.5, o["wool"], 12)
+        for k in range(6):
+            a = k * 2.4
+            m.ball(-L * 0.32 + k * L * 0.13, math.sin(a) * W * 0.22, lh + H + 0.3 + math.cos(a) * 0.2, L * 0.15, W * 0.3, H * 0.22, o["wool"], 8)
     if o.get("saddle"):
-        m.box(-2, -W / 2 - 0.2, lh + H, 2, W / 2 + 0.2, lh + H + 0.6, o["saddle"])
+        m.box(-2, -W / 2 - 0.2, lh + H - 0.2, 2, W / 2 + 0.2, lh + H + 0.5, o["saddle"])
     if o.get("packs"):
         for sd in (1, -1):
-            m.box(-2.2, sd * (W / 2 + 0.1) - 1.1, lh + 1.2, 2.2, sd * (W / 2 + 0.1) + 1.1, lh + H + 0.8, o["packs"])
+            m.ball(0, sd * (W / 2 + 0.5), lh + H * 0.6, 2.3, 1.15, H * 0.5, o["packs"], 8)
+        m.box(-0.5, -W / 2 - 0.4, lh + H - 0.2, 0.5, W / 2 + 0.4, lh + H + 0.35, "wood2")   # the strap over its back
     top = lh + H
     if o.get("torso"):   # a centaur: a man from the waist up where the neck would be
         m.at(L / 2 - 1.6, 0, top - 7)
@@ -294,44 +389,51 @@ def beast(m, t, o):
         hx = L / 2 + o.get("reach", 1.2)
         hw, hl, hh = o.get("headw", W * 0.72), o.get("headl", 3.2), o.get("headh", 3)
         nod = math.sin(t * math.tau * 2) * 0.3 if walk else 0
-        if nk:
-            m.box(L / 2 - 2.2, -hw / 2 + 0.2, top - 1.6, L / 2 + 0.4, hw / 2 - 0.2, top + nk, o.get("neckc", body))
         hz = top - hh + up + nk + nod
         head = o.get("head", body)
-        m.box(hx - hl / 2, -hw / 2, hz, hx + hl / 2, hw / 2, hz + hh, head)
-        if o.get("snout"):
-            m.box(hx + hl / 2, -hw / 2 + 0.5, hz, hx + hl / 2 + o.get("snoutl", 1.3), hw / 2 - 0.5, hz + hh * 0.62, o["snout"])
-        m.box(hx + hl / 2 - 1.0, hw / 2, hz + hh - 1.4, hx + hl / 2 - 0.2, hw / 2 + 0.1, hz + hh - 0.6, "eye")
-        m.box(hx + hl / 2 - 1.0, -hw / 2 - 0.1, hz + hh - 1.4, hx + hl / 2 - 0.2, -hw / 2, hz + hh - 0.6, "eye")
+        m.limb((L / 2 - 1.6, 0, top - H * 0.42), (hx - hl * 0.25, 0, hz + hh * 0.45), min(W, H) * 0.42, hw * 0.4, o.get("neckc", body), 8)
+        m.ball(hx, 0, hz + hh / 2, hl / 2 * 1.05, hw / 2, hh / 2, head, 10)
+        sl = o.get("snoutl", 1.3) if o.get("snout") else 0.7
+        m.ball(hx + hl / 2 + sl * 0.25, 0, hz + hh * 0.36, sl * 0.7 + 0.45, max(0.5, hw / 2 - 0.4), hh * 0.34, o.get("snout") or head, 8)
+        for sd in (1, -1):
+            m.ball(hx + hl * 0.2, sd * hw * 0.46, hz + hh * 0.68, 0.34, 0.2, 0.36, "eye", 6)
         if o.get("ears"):
             for sd in (1, -1):
-                m.box(hx - hl / 2, sd * hw / 2 - 0.5, hz + hh, hx - hl / 2 + 1, sd * hw / 2 + 0.5, hz + hh + o.get("earh", 1.2), o["ears"])
+                m.prism(hx - hl * 0.3, sd * hw * 0.4, hz + hh * 0.85, 0.5, 0.05, o.get("earh", 1.2) + 0.4, o["ears"], 5)
         if o.get("horns"):
             for sd in (1, -1):
                 if o.get("hornstyle") == "wide":
-                    m.box(hx - 0.6, sd * hw / 2, hz + hh - 0.6, hx + 0.2, sd * (hw / 2 + 2.2), hz + hh + 0.2, o["horns"])
-                    m.box(hx - 0.6, sd * (hw / 2 + 1.4), hz + hh, hx + 0.2, sd * (hw / 2 + 2.2), hz + hh + 1.6, o["horns"])
+                    m.limb((hx - 0.2, sd * hw * 0.4, hz + hh - 0.3), (hx - 0.2, sd * (hw / 2 + 1.7), hz + hh + 0.2), 0.45, 0.36, o["horns"], 6)
+                    m.limb((hx - 0.2, sd * (hw / 2 + 1.7), hz + hh + 0.2), (hx + 0.3, sd * (hw / 2 + 1.9), hz + hh + 1.9), 0.36, 0.08, o["horns"], 6)
                 else:
-                    m.box(hx - 1.4, sd * (hw / 2 - 0.9), hz + hh, hx - 0.6, sd * (hw / 2 - 0.1), hz + hh + o.get("hornh", 2), o["horns"])
+                    hn = o.get("hornh", 2)
+                    m.limb((hx - 1.0, sd * (hw / 2 - 0.5), hz + hh - 0.2), (hx - 1.5, sd * (hw / 2 - 0.3), hz + hh + hn * 0.6), 0.4, 0.3, o["horns"], 6)
+                    m.limb((hx - 1.5, sd * (hw / 2 - 0.3), hz + hh + hn * 0.6), (hx - 2.3, sd * (hw / 2 - 0.1), hz + hh + hn), 0.3, 0.08, o["horns"], 6)
                     if o.get("antlers"):
-                        m.box(hx - 1.4, sd * (hw / 2 - 0.9), hz + hh + 2, hx + 1.2, sd * (hw / 2 - 0.1), hz + hh + 2.7, o["horns"])
-                        m.box(hx - 2.6, sd * (hw / 2 - 0.9), hz + hh + 3.4, hx - 0.6, sd * (hw / 2 - 0.1), hz + hh + 4.1, o["horns"])
+                        m.limb((hx - 1.4, sd * (hw / 2 - 0.4), hz + hh + 1.2), (hx - 1.0, sd * (hw / 2 + 0.5), hz + hh + 3.4), 0.3, 0.2, o["horns"], 6)
+                        m.limb((hx - 1.2, sd * (hw / 2 + 0.1), hz + hh + 2.4), (hx + 0.9, sd * (hw / 2 + 0.3), hz + hh + 3.3), 0.24, 0.08, o["horns"], 5)
+                        m.limb((hx - 1.0, sd * (hw / 2 + 0.5), hz + hh + 3.4), (hx - 2.4, sd * (hw / 2 + 0.9), hz + hh + 4.6), 0.2, 0.06, o["horns"], 5)
+                        m.limb((hx - 1.0, sd * (hw / 2 + 0.5), hz + hh + 3.4), (hx + 0.2, sd * (hw / 2 + 0.8), hz + hh + 4.8), 0.2, 0.06, o["horns"], 5)
         if o.get("tusks"):
             for sd in (1, -1):
-                m.box(hx + hl / 2 + 0.6, sd * (hw / 2 - 0.4) - 0.3, hz + 0.6, hx + hl / 2 + 1.3, sd * (hw / 2 - 0.4) + 0.3, hz + 2.2, "white")
+                m.prism(hx + hl / 2 + 0.9, sd * (hw / 2 - 0.5), hz + 0.7, 0.34, 0.04, 1.7, "white", 5)
         if o.get("beak"):
             m.box(hx + hl / 2, -0.8, hz + 0.6, hx + hl / 2 + 1.8, 0.8, hz + 1.9, o["beak"])
             m.box(hx + hl / 2 + 1.0, -0.6, hz - 0.2, hx + hl / 2 + 1.8, 0.6, hz + 0.8, o["beak"])
-        if o.get("mane"):
-            m.box(L / 2 - 3.2, -0.6, top - 0.5, L / 2 + 0.2, 0.6, hz + hh + 0.8, o["mane"])
+        if o.get("mane"):   # down the back of the neck, in tufts
+            for k in range(6):
+                u = k / 5
+                m.ball(L / 2 - 1.9 + (hx - hl * 0.35 - L / 2 + 1.9) * u - 0.5, 0, top - 0.1 + (hz + hh * 0.9 - top + 0.1) * u + 0.3, 0.75, 0.5, 0.95, o["mane"], 6)
         if o.get("ruff"):   # a lion's mane, all round
-            m.box(L / 2 - 2.6, -hw / 2 - 1, top - H * 0.8, L / 2 + 0.6, hw / 2 + 1, hz + hh + 0.9, o["ruff"])
+            m.ball(L / 2 - 0.6, 0, (top - H * 0.5 + hz + hh) / 2 + 0.2, 2.0, hw / 2 + 1.2, (hz + hh - top + H * 0.6) / 2 + 0.9, o["ruff"], 10)
     if o.get("tail"):
         tl = o.get("taill", 3)
-        m.at(-L / 2, 0, top - 0.8, ry=o.get("tailang", 55) + (math.sin(t * math.tau * 2) * 10 if walk else 0))
-        m.box(-tl, -0.5, -0.5, 0, 0.5, 0.5, o["tail"])
+        # A long tail hangs behind (the angle is how steeply); past a right angle it is a short one held up, as a goat's or a deer's is.
+        ta = o.get("tailang", 55)
+        m.at(-L / 2 + 0.3, 0, top - H * 0.3, ry=(ta if ta > 90 else -ta) + (math.sin(t * math.tau * 2) * 10 if walk else 0))
+        m.limb((0, 0, 0), (-tl, 0, 0), 0.5, 0.32, o["tail"], 6)
         if o.get("tuft"):
-            m.box(-tl - 1.2, -0.8, -0.8, -tl, 0.8, 0.8, o["tuft"])
+            m.ball(-tl - 0.5, 0, 0, 0.95, 0.75, 0.75, o["tuft"], 7)
         m.pop()
     if o.get("wings"):
         fl = math.sin(t * math.tau)
@@ -609,6 +711,7 @@ def mesh_of(model, name, size=1):
     for n in names:
         me.materials.append(material(n))
     me.polygons.foreach_set("material_index", [names.index(c) for c in model.cols])
+    me.polygons.foreach_set("use_smooth", [i in model.smooth for i in range(len(model.faces))])
     me.update()
     return me
 
@@ -722,7 +825,9 @@ def main():
     done = {}
     for n in names:
         q = grid or UNITS[n][2]
-        done[n] = {k: render_unit(sc, cam, n, tmp, k) for k in ([q] if sheet else [q, q // 2, q // 4])}
+        small = UNITS[n][0] not in (ship,)   # a ship at the largest size would fill pages by itself
+        sizes = [q] if sheet else ([q * 2, q, q // 2, q // 4] if small and BIG else [q, q // 2, q // 4])
+        done[n] = {k: render_unit(sc, cam, n, tmp, k) for k in sizes}
         print("unit", n, flush=True)
 
     if sheet:   # one row per unit: heading 0..N of frame 0, then the frames of heading 1

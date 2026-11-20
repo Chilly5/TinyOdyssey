@@ -72,7 +72,7 @@ The viewer (`src/viewer.js`) is a small WebGL deep-zoom renderer with no depende
 - **Landmark animation.** The landmarks' moving parts: Sisyphus and his boulder, the Minotaur pacing the Labyrinth, the Clashing Rocks.
 - **Sky**: clouds and their shadows, birds, Pegasus, Icarus, smoke, fire and lightning (`src/actors.js`).
 
-The people, animals and ships are small voxel models built and rendered in **Blender** by `units/build.py`: about 45 kinds, each from 8 or 16 headings and through its walk, at three sizes. The landmarks' moving parts are rendered there too (`units/anims.py`): `gen/anims.mjs` writes each frame out as small cubes, leaving out the ones that stand behind scenery, and Blender lights and outlines them as it does the units.
+The people, animals and ships are small models built and rendered in **Blender** by `units/build.py`: about 45 kinds, each from 8 or 16 headings and through its walk. People and animals are made of round shapes (limbs with joints, heads with faces and hair, robes that flare) and rendered at four sizes, the largest for the closest zoom; ships and carts are built of boxes, at three. The landmarks' moving parts are rendered there too (`units/anims.py`): `gen/anims.mjs` writes each frame out as small cubes, leaving out the ones that stand behind scenery, and Blender lights and outlines them as it does the units.
 
 **Walking behind things.** The render knows how far south everything in the picture stands. `gen/tiles.mjs` keeps that as tiles of the scenery's height (`world/occ`), every path point carries the height of its ground, and the sprite shader compares the two: the part of a walker that is behind a house, a wall, a tree or a hill is not drawn. Ships pass behind headlands the same way.
 
@@ -121,7 +121,7 @@ After `python tiles.py`, run `node gen/build.mjs --pyramid --styles` so the mani
 The units and the landmarks' moving parts are made in Blender (5.x), before `npm run world`:
 
 ```
-blender --background --factory-startup --python units/build.py     # the units -> units/out                    (2 minutes)
+blender --background --factory-startup --python units/build.py -- --grid 8 --big     # the units -> units/out     (half a minute)
 node gen/build.mjs --anims                                          # the moving parts, as cubes -> units/anims/src
 blender --background --factory-startup --python units/anims.py     # rendered -> units/anims/out               (3 minutes)
 blender --background --factory-startup --python units/build.py -- --only man,trireme --sheet sheet.png    # a contact sheet to look at
