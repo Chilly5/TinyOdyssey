@@ -52,8 +52,9 @@ walk(dist);
 console.log(`dist: ${files} files, ${(bytes / 1e6).toFixed(0)} MB`);
 
 git(dist, 'init', '-q', '-b', 'gh-pages');
-git(dist, 'add', '-A');
-git(dist, '-c', 'user.name=' + (git(root, 'config', 'user.name') || 'TinyOdyssey'), '-c', 'user.email=' + (git(root, 'config', 'user.email') || 'noreply@example.com'),
+git(dist, '-c', 'core.autocrlf=false', 'add', '-A'); // the files go up exactly as they are
+const who = (key, dflt) => { try { return git(root, 'config', key) || dflt; } catch { return dflt; } };
+git(dist, '-c', 'user.name=' + who('user.name', 'TinyOdyssey'), '-c', 'user.email=' + who('user.email', 'noreply@example.com'), '-c', 'core.autocrlf=false',
   'commit', '-q', '-m', `Site, built ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from ${git(root, 'rev-parse', '--short', 'HEAD')}`);
 if (process.argv.includes('--dry')) {
   console.log(`dry run: not pushed. Would publish to ${site || remote}`);
