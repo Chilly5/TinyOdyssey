@@ -42,7 +42,7 @@ const dist = path.join(root, 'dist');
 // sends only the files that have changed since (a few megabytes, not all seven hundred).
 fs.mkdirSync(dist, { recursive: true });
 for (const e of fs.readdirSync(dist)) if (e !== '.git') fs.rmSync(path.join(dist, e), { recursive: true, force: true });
-for (const f of ['index.html', 'preview.jpg', '.nojekyll', 'CNAME']) if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(dist, f));
+for (const f of ['index.html', 'preview.jpg', 'favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'icon-512.png', '.nojekyll', 'CNAME']) if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(dist, f));
 fs.cpSync(path.join(root, 'src'), path.join(dist, 'src'), { recursive: true });
 fs.cpSync(world, path.join(dist, 'world'), { recursive: true });
 if (site) { // link previews want whole addresses

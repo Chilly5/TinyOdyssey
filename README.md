@@ -182,6 +182,7 @@ python paint.py --resume                                                   # car
 | What is heard | `src/sound.js` | reload |
 | Bloom, contrast, blur, night, sea animation | `src/viewer.js` | reload |
 | Page chrome and fonts | `index.html` | reload |
+| The site's icon | the grid of letters in `tools/favicon.mjs` | `node tools/favicon.mjs` |
 
 ## A note on the geography of myth, and on the painting
 
