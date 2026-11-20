@@ -1,12 +1,18 @@
 {
   "name": "tinyodyssey",
   "version": "1.0.0",
-  "description": "An animated hex diorama of mythological Greece.",
+  "description": "An animated voxel-art map of mythological Greece: a 3D render redrawn by an image model into one deep-zoom picture, with little people going about their day.",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node tools/serve.mjs",
-    "terrain": "node tools/build-terrain.mjs",
-    "artifact": "node tools/make-artifact.mjs"
+    "world": "node gen/build.mjs",
+    "cond": "node gen/build.mjs --cond",
+    "spots": "node gen/build.mjs --spots",
+    "refresh": "node gen/build.mjs --refresh",
+    "deploy": "node tools/deploy.mjs"
+  },
+  "devDependencies": {
+    "three": "^0.170.0"
   }
 }

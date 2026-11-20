@@ -13,12 +13,17 @@ const types = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
 };
 
 http
   .createServer((req, res) => {
-    const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    const parsed = new URL(req.url, 'http://x');
+    const url = decodeURIComponent(parsed.pathname);
+    // Tiles and sheets are requested with a version stamp, so they can be cached for good.
+    const cache = parsed.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'no-cache';
     let file = path.join(root, url);
     if (!file.startsWith(root)) {
       res.writeHead(403).end();
@@ -30,7 +35,7 @@ http
         res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream', 'Cache-Control': cache });
       res.end(data);
     });
   })

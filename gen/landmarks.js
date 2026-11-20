@@ -1,15 +1,17 @@
-// The landmarks. Each entry in MODELS draws one site in local space: static
-// parts go into the shared Geo `g`, moving parts are added to `L.group` through
-// the effects system `L.fx`. Local axes: x east, z south (towards the viewer), y up.
+// The landmarks. Each entry in MODELS draws one site in local space: fixed parts
+// go into the Geo `g`, parts that move are added to `L.group` through `L.fx`
+// (see bake.mjs, which turns both into pixel splats and animation frames).
+// Local axes: x east, z south (towards the viewer), y up.
 
 import * as THREE from './three.js';
 import { Geo, rgb, shade } from './kit.js';
-import { makeTemplates } from './terrain.js';
-import { LANDMARK_SCALE as S } from './config.js';
+
+const S = 1; // models are built, and baked, in their own units
 import {
   C, temple, tholos, wallRing, house, person, beast, disc, crag, cave, cloud,
   sheep, pig, cow, lion,
 } from './models.js';
+import { MINOR } from './minor.js';
 
 const TAU = Math.PI * 2;
 const SOUTH = -Math.PI / 2; // rotation that turns a beast (built facing +x) towards the viewer
@@ -76,7 +78,7 @@ function wander(L, geo, o) {
   return m;
 }
 
-const MODELS = {
+export const MODELS = {
   // ------------------------------------------------------------------ gods --
   olympus(g, s, L) {
     g.cyl(0, 0, 0, 1.0, 0.92, 0.16, 8, C.marbleD, { top: C.marble });
@@ -89,14 +91,7 @@ const MODELS = {
     const ring = new THREE.Group();
     ring.position.y = -1.0;
     L.group.add(ring);
-    for (let i = 0; i < 6; i++) {
-      const cg = new Geo();
-      cloud(cg, i + 3);
-      const m = L.fx.mesh(ring, cg, { shadow: true });
-      const a = (i / 6) * TAU;
-      m.position.set(Math.cos(a) * 2.5, (i % 2) * 0.35, Math.sin(a) * 2.2);
-      m.scale.setScalar(0.3 + (i % 3) * 0.05);
-    }
+    L.fx.ring(ring, { r: 2.4 }); // drawn live as drifting puffs (see actors.js)
     const bolt = L.fx.lightning(L.group);
     let next = 3;
     L.fx.tick((t) => {
@@ -191,8 +186,8 @@ const MODELS = {
     const basalt = rgb('#5c5566');
     g.cyl(0, -0.4, 0, 1.2, 0.5, 0.95, 8, basalt, { top: C.dark });
     const lg = new Geo();
-    lg.cyl(0, 0, 0, 0.42, 0.42, 0.02, 8, C.lava, { top: C.lava });
-    lg.cyl(0, 0.01, 0, 0.22, 0.22, 0.02, 6, C.flame, { top: C.flame });
+    lg.cyl(0, 0, 0, 0.3, 0.3, 0.02, 8, C.lava, { top: C.lava }); // a pool inside the crater, not a lid on it
+    lg.cyl(0, 0.01, 0, 0.15, 0.15, 0.02, 6, C.flame, { top: C.flame });
     const lava = L.fx.mesh(L.group, lg, { glow: true });
     lava.position.y = 0.56;
     L.fx.tick((t) => lava.scale.setScalar(0.92 + 0.08 * Math.sin(t * 2.3)));
@@ -312,7 +307,7 @@ const MODELS = {
     house(g, 1.4, 0, 0.2, 1, -0.3);
     L.tree('cypress', -1.4, 0.3, 1.1);
     L.tree('cypress', 1.5, -0.4, 1.0);
-    flock(L, { n: 1, r: 0.7, y: 1.7, spread: 0, speed: 0.6, size: 0.8, color: rgb('#c9b08a'), z: -0.2 }); // Athena's owl
+    flock(L, { n: 1, r: 0.7, y: 1.7, spread: 0, speed: 0.6, size: 0.34, color: rgb('#8a6f4e'), z: -0.2 }); // Athena's owl
   },
 
   mycenae(g) {
@@ -368,13 +363,15 @@ const MODELS = {
     L.fx.tick((t) => {
       const c = t % 12;
       let u, mu;
-      if (c < 8.5) { u = 0.1 + 0.8 * (c / 8.5) ** 0.8; mu = u - 0.14; } // heave
-      else if (c < 9.1) { u = 0.9 + Math.sin((c - 8.5) * 20) * 0.01; mu = 0.76; } // almost
-      else if (c < 10.3) { const k = (c - 9.1) / 1.2; u = 0.9 - 0.8 * k * k; mu = 0.76; } // and down it goes
-      else { u = 0.1; mu = 0.76 - 0.8 * ((c - 10.3) / 1.7); } // the walk back
+      // He stands a little below the boulder and a step nearer the camera, so that he is seen pushing it
+      // and not hidden behind it.
+      if (c < 8.5) { u = 0.1 + 0.8 * (c / 8.5) ** 0.8; mu = u - 0.25; } // heave
+      else if (c < 9.1) { u = 0.9 + Math.sin((c - 8.5) * 20) * 0.01; mu = 0.65; } // almost
+      else if (c < 10.3) { const k = (c - 9.1) / 1.2; u = 0.9 - 0.8 * k * k; mu = 0.65; } // and down it goes
+      else { u = 0.1; mu = 0.65 - 0.8 * ((c - 10.3) / 1.7); } // the walk back
       boulder.position.set(A[0] + (B[0] - A[0]) * u + nx * 0.2, (B[1] - A[1]) * u + ny * 0.2, -0.05);
       boulder.rotation.z = -u * len / 0.2;
-      man.position.set(A[0] + (B[0] - A[0]) * mu, Math.max(0, (B[1] - A[1]) * mu), -0.05);
+      man.position.set(A[0] + (B[0] - A[0]) * mu, Math.max(0, (B[1] - A[1]) * mu), 0.12);
       man.rotation.y = c >= 10.3 ? Math.PI : 0;
     });
   },
@@ -613,15 +610,10 @@ const MODELS = {
   },
 
   storm(g, s, L) {
-    const cg = new Geo();
-    cloud(cg, 5, { top: rgb('#77728a'), under: rgb('#4a465c') });
-    cloud(cg, 8, { top: rgb('#676279'), under: rgb('#423e54') });
-    const m = L.fx.mesh(L.group, cg, { shadow: true });
-    m.position.y = 3.4;
+    // The storm cloud itself is a live sprite (see actors.js); only its lightning is declared here.
     const bolt = L.fx.lightning(L.group, { color: '#fffbd0' });
     let next = 2;
     L.fx.tick((t) => {
-      m.position.x = Math.sin(t * 0.2) * 0.5;
       if (t > next) {
         const x = (Math.random() - 0.5) * 2.4, z = (Math.random() - 0.3) * 1.6;
         bolt([x * 0.5, 3.3, z * 0.3], [x, 0, z], 0.06);
@@ -829,10 +821,10 @@ const MODELS = {
     }
     wg.cyl(0, -0.01, 0, 0.12, 0.12, 0.01, 7, rgb('#1b3a78'));
     const whirl = L.fx.mesh(L.group, wg, { glow: true });
-    whirl.position.set(-0.25, 0.035, 0.55);
+    whirl.position.set(-0.2, 0.035, 0.55);
     L.fx.tick((t) => {
       whirl.rotation.y = -t * 1.7;
-      whirl.scale.setScalar(1 + 0.08 * Math.sin(t * 0.7));
+      whirl.scale.setScalar(0.6 * (1 + 0.08 * Math.sin(t * 0.7))); // small enough to keep to the channel
     });
   },
 
@@ -897,40 +889,5 @@ const MODELS = {
   },
 };
 
-export function buildLandmarks(grid, sites, fx, scene) {
-  const T = makeTemplates();
-  const geo = new Geo(65536);
-  const material = new THREE.MeshLambertMaterial({ vertexColors: true });
-
-  // Nearest open water around a point, searched outwards starting near `prefer` (radians, 0 = south).
-  const findSea = (x, z, r0, r1, prefer = 0) => {
-    for (let r = r0; r <= r1; r += 0.5) {
-      for (let i = 0; i < 16; i++) {
-        const a = prefer + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 8);
-        const px = x + Math.sin(a) * r, pz = z + Math.cos(a) * r;
-        if (!grid.landAt(px, pz) && !grid.landAt(px + 0.6, pz) && !grid.landAt(px - 0.6, pz) && !grid.landAt(px, pz + 0.6)) return [px, pz];
-      }
-    }
-    return [x + r1, z];
-  };
-
-  for (const s of sites) {
-    const fn = MODELS[s.model];
-    if (!fn) continue;
-    const group = new THREE.Group();
-    group.position.set(s.x, s.y, s.z);
-    group.scale.setScalar(S);
-    scene.add(group);
-    geo.at(s.x, s.y, s.z, 0, S, (g) => {
-      const L = {
-        fx, group, scene, grid, T, findSea,
-        tree: (name, x, z, scale = 1, y = 0) => g.add(T[name], x, y, z, (x * 7 + z * 13) % 6.28, scale),
-      };
-      fn(g, s, L);
-    });
-  }
-  const mesh = new THREE.Mesh(geo.build(), material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return { mesh, material };
-}
+// The small models of the minor places.
+Object.assign(MODELS, MINOR);

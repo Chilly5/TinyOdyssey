@@ -7,7 +7,14 @@
 <!--page-->
 <title>TinyOdyssey</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="An animated hex diorama of mythological Greece. Follow Odysseus home from Troy.">
+<meta name="description" content="An animated voxel-art diorama of mythological Greece that you can zoom deep into. Follow Odysseus home from Troy.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="TinyOdyssey">
+<meta property="og:description" content="Mythic Greece in miniature: one enormous voxel-art picture, alive with little people, ships and monsters. Zoom in.">
+<meta property="og:image" content="preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Jersey+25&family=Pixelify+Sans:wght@400;500;600;700&display=swap">
 <style>
   /* Layout: the diorama fills the screen; chrome floats in the corners on a 16px gutter,
@@ -48,6 +55,8 @@
       1px 1px var(--outline), -1px 1px var(--outline), 1px -1px var(--outline), -1px -1px var(--outline), 0 2px var(--outline); }
   .lbl.on { visibility: visible; pointer-events: auto; }
   .lbl[data-tier="1"] { font-size: 16px; }
+  .lbl[data-tier="4"] { font-size: 12px; font-weight: 500; gap: 4px; }
+  .lbl[data-tier="4"] i { width: 4px; height: 4px; }
   .lbl i { width: 6px; height: 6px; flex: none; transform: rotate(45deg); background: var(--ink); box-shadow: 0 0 0 1px var(--outline); }
   .lbl[data-kind="gods"] i { background: var(--gold); }
   .lbl[data-kind="heroes"] i { background: var(--clay); }
@@ -80,7 +89,8 @@
     background: var(--meander) left top / 16px 8px repeat-x; image-rendering: pixelated; }
 
   #tools { grid-area: 1 / 2; display: flex; gap: 8px; align-items: flex-start; justify-content: flex-end; flex-wrap: wrap; }
-  #zoom { grid-area: 3 / 2; display: flex; flex-direction: column; gap: 8px; align-self: end; justify-self: end; }
+  #zoom { grid-area: 3 / 2; display: flex; flex-direction: column; gap: 8px; align-self: end; justify-self: end; align-items: center; }
+  #zoomPct { font: 500 13px/1 var(--body, inherit); color: var(--ink); text-shadow: 0 1px 0 var(--outline), 0 0 6px var(--shade); letter-spacing: 0.04em; }
   #hint { grid-area: 3 / 1; align-self: end; justify-self: start; margin: 0; padding: 4px 9px; font-size: 13px; color: var(--dim);
     background: rgba(21, 18, 46, 0.72); }
 
@@ -108,6 +118,7 @@
   #atlas ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 2px 10px; }
   #atlas li button { display: block; width: 100%; padding: 3px 4px; text-align: left; background: none; border: 0; cursor: pointer; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #atlas li button:hover { background: var(--panel-hi); color: var(--gold); }
+  #atlas li.minor button { color: var(--dim); font-size: 0.92em; }
   #about a { color: var(--sea); }
   #about dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
   #about dt { color: var(--dim); }
@@ -136,18 +147,18 @@
   @keyframes march { to { background-position-x: 16px; } }
 
   @media (max-width: 720px) {
-    #ui { grid-template: auto 1fr auto / minmax(0, 1fr); gap: 8px; }
+    #ui { grid-template: auto 1fr auto / auto minmax(0, 1fr); gap: 8px; }
     #brand { padding: 5px 10px 7px; }
     #brand h1 { font-size: 28px; }
     #brand p { display: none; }
-    #tools { grid-area: 1 / 1; justify-self: end; }
+    #tools { grid-area: 1 / 2; justify-self: end; gap: 6px; } /* beside the name, and onto a second row when the phone is narrow */
     #tools .btn span { display: none; }
     #tools .btn { width: 34px; padding: 0; justify-content: center; }
     #tools .btn.go { width: auto; padding: 4px 12px; }
-    #brand { justify-self: start; }
+    #brand { justify-self: start; align-self: start; }
     #zoom, #hint { display: none; }
-    #side { grid-area: 3 / 1; align-self: end; width: 100%; max-height: 46vh; }
-    #voyage { grid-area: 3 / 1; }
+    #side { grid-area: 3 / 1 / 4 / 3; align-self: end; width: 100%; max-height: 46vh; }
+    #voyage { grid-area: 3 / 1 / 4 / 3; }
     #voyage .main { grid-template-columns: minmax(0, 1fr) auto auto; }
     #voyage .main > .txt { grid-column: 1 / -1; grid-row: 1; }
     #voyage .main #vPrev { grid-column: 2; grid-row: 2; }
@@ -167,17 +178,19 @@
 </head>
 <body>
 <!--page-->
-<canvas id="world" aria-label="Animated hex map of mythological Greece. Drag to pan, scroll to zoom."></canvas>
+<canvas id="world" aria-label="Animated pixel-art map of mythological Greece. Drag to pan, scroll to zoom."></canvas>
 <div id="labels"></div>
 
 <div id="ui">
   <header id="brand" class="panel">
     <h1>Tiny<b>Odyssey</b></h1>
-    <p>Mythic Greece in miniature, one hex at a time</p>
+    <p>Mythic Greece in miniature. Zoom in.</p>
   </header>
 
   <nav id="tools" aria-label="Map tools">
     <button class="btn go" id="btnVoyage" type="button" aria-label="Sail the Odyssey">Sail<span>&nbsp;the Odyssey</span></button>
+    <button class="btn" id="btnTime" type="button" title="Day and night come and go"><b aria-hidden="true">&#9680;</b><span>Day &amp; night</span></button>
+    <button class="btn" id="btnSound" type="button" aria-pressed="false" title="Sound is off" aria-label="Sound"><b aria-hidden="true">&#9834;</b><span>Sound</span></button>
     <button class="btn" id="btnAtlas" type="button" aria-pressed="false" title="Atlas of places"><b aria-hidden="true">&#9776;</b><span>Atlas</span></button>
     <button class="btn" id="btnAbout" type="button" aria-pressed="false" title="About this map"><b aria-hidden="true">?</b><span>About</span></button>
   </nav>
@@ -212,22 +225,28 @@
         <button class="btn icon" type="button" data-close aria-label="Close">&times;</button>
       </header>
       <div class="body">
-        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data, sampled onto 95,000 hexes about five kilometres across. The temples and monsters do not.</p>
+        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data. A 3D model of the whole scene, with every tree, town, road and temple in place, was rendered through one fixed camera. An image model then redrew that render as voxel art, window by window, into a single picture of 880 million pixels, painted all the land again at twice that scale, and the towns and landmarks at four times. What you are zooming into is that picture; smaller stories show their names as you get close. The sea, the ships, the monsters and the people going about their day are drawn live on top, and step behind the houses as they pass. A day lasts five minutes: at dusk the lamps come on and most people go indoors.</p>
         <p>Where the ancient world argued about a location, which is most of the Odyssey, the map follows the tradition repeated most often and says so.</p>
         <dl>
           <dt>Terrain</dt><dd>SRTM, GMTED and ETOPO1 through Mapzen terrain tiles</dd>
-          <dt>Scale</dt><dd>1 hex is about 5 km; heights are stretched roughly eight times</dd>
-          <dt>Inspired by</dt><dd><a href="https://hexagonal.earth/" target="_blank" rel="noopener">hexagonal.earth</a></dd>
+          <dt>Scale</dt><dd>1 pixel of the open country is about 40 m; heights are stretched roughly seven times; towns and landmarks are toy-sized on purpose</dd>
+          <dt>Painted by</dt><dd>FLUX.2 klein, an open image model. It redrew every tree and temple, so treat details as illustration.</dd>
+          <dt>People, ships and monsters</dt><dd>About 45 small voxel models and the landmarks' own moving parts, built and rendered in Blender</dd>
+          <dt>Sound</dt><dd>Made in the browser from noise and a few sine waves: sea, wind, birds, crickets, a lyre where the Muses are. Off until you turn it on.</dd>
+          <dt>Keys</dt><dd>Arrows or WASD move, + and &minus; zoom, N changes the time of day, M the sound, P the pixel look</dd>
+          <dt>Inspired by</dt><dd><a href="https://hexagonal.earth/" target="_blank" rel="noopener">hexagonal.earth</a> and the isometric city maps of <a href="https://isometric.nyc" target="_blank" rel="noopener">New York</a>, <a href="https://tiny.london" target="_blank" rel="noopener">London</a>, <a href="https://www.yadongxie.com/lab/singapore" target="_blank" rel="noopener">Singapore</a> and <a href="https://isometricsf.com" target="_blank" rel="noopener">San Francisco</a></dd>
         </dl>
       </div>
     </section>
   </aside>
 
-  <p id="hint">Drag to pan. Scroll or pinch to zoom. Click a name.</p>
+  <p id="hint">Drag to pan. Scroll or pinch to zoom, a long way. Click a name.</p>
 
   <div id="zoom">
+    <output id="zoomPct" aria-label="Zoom level">100%</output>
     <button class="btn icon" id="zoomIn" type="button" aria-label="Zoom in">+</button>
     <button class="btn icon" id="zoomOut" type="button" aria-label="Zoom out">&minus;</button>
+    <button class="btn icon" id="zoomFit" type="button" aria-label="Show the whole map" title="Whole map">&#9635;</button>
   </div>
 
   <section id="voyage" class="panel" hidden aria-live="polite">

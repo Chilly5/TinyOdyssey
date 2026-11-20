@@ -2,3 +2,16 @@ tools/.cache/
 node_modules/
 dist/
 .DS_Store
+
+paint/.venv/
+paint/.models/
+paint/work/
+
+# Built, and large. The finished site is published from the gh-pages branch (npm run deploy).
+world/
+world.next/
+world.old/
+units/anims/
+
+units/out/
+__pycache__/

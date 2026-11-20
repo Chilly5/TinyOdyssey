@@ -2,9 +2,9 @@
 // focused with the keyboard and are read by screen readers. More names appear
 // as you zoom in, and a name gives way if it would overlap a more important one.
 
-const TIER_ZOOM = [0, 0, 3.1, 6.2]; // art pixels per hex needed before a tier shows
+const TIER_ZOOM = [0, 0, 0.3, 0.72, 1.5]; // screen pixels per image pixel needed before a tier shows
 
-export function createLabels(root, view, onPick) {
+export function createLabels(root, viewer, onPick) {
   const items = [];
   let selected = null;
 
@@ -37,12 +37,11 @@ export function createLabels(root, view, onPick) {
   const placed = [];
   function update() {
     placed.length = 0;
-    const { cssW, cssH, ppu } = view;
+    const { cssW, cssH, zoom } = viewer;
     for (const it of items) { // items are kept in priority order
-      const t = it.target;
-      let show = ppu >= TIER_ZOOM[it.tier] || it.id === selected;
+      let show = zoom >= TIER_ZOOM[it.tier] || it.id === selected;
       if (show) {
-        view.project(t.x, t.y, t.z + (it.reach || 0), p);
+        viewer.toScreen(it.target.x, it.target.y, p);
         const x = Math.round(p.x - it.w / 2), y = Math.round(p.y + (it.dy || 4));
         show = x + it.w > 0 && x < cssW && y + it.h > 0 && y < cssH;
         if (show && it.id !== selected) {

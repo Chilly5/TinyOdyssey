@@ -1,0 +1,4 @@
+# One prompt per line; try_prompts.py paints each spot once per line.
+# PROMPT and ANCHOR stand for the prompts in paint.py; {hint} is replaced by the landmark's line.
+PROMPT
+ANCHOR

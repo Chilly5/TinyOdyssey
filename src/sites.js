@@ -1,7 +1,8 @@
 // The gazetteer: every named place on the map.
 //
 //   kind   gods | heroes | monsters | odyssey   (sets the label colour and the atlas group)
-//   tier   1 = always labelled, 2 = labelled at normal zoom, 3 = only when zoomed in
+//   tier   1 = always labelled, 2 = labelled at normal zoom, 3 = only when zoomed in, 4 = a minor place, named only close up
+//   town   houses in the town built round the landmark; walls: true rings it with a wall
 //   model  which landmark to build there (see landmarks.js); omitted = label only
 //   flat   radius of ground levelled for the landmark, in hexes
 //   peak   put the landmark on the highest ground nearby instead of the exact spot
@@ -9,6 +10,8 @@
 //
 // Where the ancient world argued about a location (most of the Odyssey), the map
 // follows the most widely repeated tradition and says so in the text.
+
+import { MINOR_SITES } from './minor.js';
 
 export const KINDS = {
   gods: { label: 'Gods & Titans' },
@@ -26,17 +29,17 @@ export const SITES = [
   },
   {
     id: 'delphi', name: 'Delphi', greek: 'Δελφοί', kind: 'gods', tier: 1, lon: 22.501, lat: 38.482,
-    model: 'delphi', flat: 1.3,
+    model: 'delphi', flat: 1.3, town: 16,
     text: 'Zeus loosed two eagles from the ends of the earth and they met here, at the navel of the world. Apollo killed the serpent Python on this slope, and his priestess, the Pythia, breathes the vapours rising from the rock and speaks in riddles.',
   },
   {
     id: 'delos', name: 'Delos', greek: 'Δῆλος', kind: 'gods', tier: 2, lon: 25.27, lat: 37.4,
-    model: 'delos', flat: 0.6,
+    model: 'delos', flat: 0.6, town: 6,
     text: 'A drifting rock until Leto, hunted by jealous Hera, clung to its palm tree and gave birth to Apollo and Artemis. Zeus then chained the island to the sea floor. The Cyclades are named for the circle they form around it.',
   },
   {
     id: 'lemnos', name: 'Lemnos', greek: 'Λῆμνος', kind: 'gods', tier: 2, lon: 25.2, lat: 39.9,
-    model: 'forge', flat: 1.0,
+    model: 'forge', flat: 1.0, town: 10,
     text: 'When Hephaestus was thrown from Olympus he fell for a whole day and landed here. The islanders nursed him, and he set up his forge on the island. The smoke you see is the smith god at work.',
   },
   {
@@ -46,7 +49,7 @@ export const SITES = [
   },
   {
     id: 'dodona', name: 'Dodona', greek: 'Δωδώνη', kind: 'gods', tier: 2, lon: 20.79, lat: 39.546,
-    model: 'dodona', flat: 1.1,
+    model: 'dodona', flat: 1.1, town: 10,
     text: 'The oldest oracle in Greece. Barefoot priests read the will of Zeus in the rustling of a sacred oak and the ringing of bronze cauldrons hung around it. A beam cut from this oak was built into the prow of the Argo and could speak.',
   },
   {
@@ -71,17 +74,17 @@ export const SITES = [
   },
   {
     id: 'ephesus', name: 'Ephesus', greek: 'Ἔφεσος', kind: 'gods', tier: 2, lon: 27.341, lat: 37.94,
-    model: 'artemision', flat: 1.7,
+    model: 'artemision', flat: 1.7, town: 55, walls: true,
     text: 'Home of the great temple of Artemis, said to have been founded by the Amazons. It grew into one of the seven wonders of the world.',
   },
   {
     id: 'enna', name: 'Enna', greek: 'Ἔννα', kind: 'gods', tier: 2, lon: 14.28, lat: 37.57,
-    model: 'meadow', flat: 1.3,
+    model: 'meadow', flat: 1.3, town: 12,
     text: 'Persephone was picking flowers in this meadow when the ground split open and Hades carried her down to the underworld. Her mother Demeter searched the earth for her and let nothing grow, which was the first winter.',
   },
   {
     id: 'naxos', name: 'Naxos', greek: 'Νάξος', kind: 'gods', tier: 2, lon: 25.42, lat: 37.09,
-    model: 'naxos', flat: 1.0,
+    model: 'naxos', flat: 1.0, town: 14,
     text: 'Theseus abandoned Ariadne on this shore after she helped him out of the Labyrinth. Dionysus found her here and married her, and set her crown among the stars.',
   },
   {
@@ -108,32 +111,32 @@ export const SITES = [
   // -------------------------------------------------------------- heroes ----
   {
     id: 'athens', name: 'Athens', greek: 'Ἀθῆναι', kind: 'heroes', tier: 1, lon: 23.727, lat: 37.972,
-    model: 'athens', flat: 1.9,
+    model: 'athens', flat: 1.9, town: 90, walls: true,
     text: 'Athena and Poseidon competed to be patron of the city. He struck the Acropolis and a salt spring came up; she planted the first olive tree and won. Theseus, who killed the Minotaur, was its king.',
   },
   {
     id: 'mycenae', name: 'Mycenae', greek: 'Μυκῆναι', kind: 'heroes', tier: 2, lon: 22.756, lat: 37.731,
-    model: 'mycenae', flat: 1.2,
+    model: 'mycenae', flat: 1.2, town: 22,
     text: 'The citadel of Agamemnon, who led the Greeks to Troy. Its walls are so massive that later Greeks believed the Cyclopes built them. Agamemnon came home through the Lion Gate after ten years and was murdered in his bath.',
   },
   {
     id: 'sparta', name: 'Sparta', greek: 'Σπάρτη', kind: 'heroes', tier: 1, lon: 22.43, lat: 37.075,
-    model: 'sparta', flat: 1.4,
+    model: 'sparta', flat: 1.4, town: 45,
     text: 'The palace of Menelaus and Helen. Paris of Troy came as a guest and left with the queen, and a thousand ships sailed to bring her back. Telemachus visits here in the Odyssey looking for news of his father.',
   },
   {
     id: 'corinth', name: 'Corinth', greek: 'Κόρινθος', kind: 'heroes', tier: 2, lon: 22.88, lat: 37.9,
-    model: 'sisyphus', flat: 1.2,
+    model: 'sisyphus', flat: 1.2, town: 40, walls: true,
     text: 'Its founder Sisyphus cheated death twice. His punishment is to push a boulder up a hill forever; each time he nears the top it rolls back down. Bellerophon caught the winged horse Pegasus at the spring here.',
   },
   {
     id: 'thebes', name: 'Thebes', greek: 'Θῆβαι', kind: 'heroes', tier: 2, lon: 23.32, lat: 38.32,
-    model: 'thebes', flat: 1.4,
+    model: 'thebes', flat: 1.4, town: 50, walls: true,
     text: 'Cadmus founded the city by sowing dragon\'s teeth. Later a Sphinx sat outside the gates and ate everyone who failed her riddle, until Oedipus answered it. Heracles and Dionysus were both born here.',
   },
   {
     id: 'olympia', name: 'Olympia', greek: 'Ὀλυμπία', kind: 'heroes', tier: 2, lon: 21.63, lat: 37.638,
-    model: 'olympia', flat: 1.4,
+    model: 'olympia', flat: 1.4, town: 20,
     text: 'Pelops won his bride in a chariot race here, and Heracles paced out the first stadium. The games held every four years in honour of Zeus stopped wars across Greece.',
   },
   {
@@ -153,12 +156,12 @@ export const SITES = [
   },
   {
     id: 'pylos', name: 'Pylos', greek: 'Πύλος', kind: 'heroes', tier: 3, lon: 21.7, lat: 37.03,
-    model: 'megaron', flat: 1.0,
+    model: 'megaron', flat: 1.0, town: 24,
     text: 'Sandy Pylos, kingdom of wise old Nestor, who fought at Troy in his third generation of men. Telemachus lands here first when he sets out to find his father.',
   },
   {
     id: 'iolcos', name: 'Iolcos', greek: 'Ἰωλκός', kind: 'heroes', tier: 2, lon: 22.92, lat: 39.34,
-    model: 'harbor', flat: 0.9,
+    model: 'harbor', flat: 0.9, town: 30, walls: true,
     text: 'Jason was sent from this harbour to fetch the Golden Fleece from Colchis, at the far end of the Black Sea. He launched the Argo here with a crew of fifty heroes. Watch for her sail heading for the Hellespont.',
   },
   {
@@ -167,8 +170,8 @@ export const SITES = [
     text: 'Home of the centaurs. The wisest of them, Chiron, kept a cave here and brought up Jason, Asclepius and Achilles, teaching them medicine, music and the bow.',
   },
   {
-    id: 'troy', name: 'Troy', greek: 'Τροία', kind: 'heroes', tier: 1, lon: 26.239, lat: 39.957,
-    model: 'troy', flat: 2.1,
+    id: 'troy', name: 'Troy', greek: 'Τροία', kind: 'heroes', tier: 1, lon: 26.34, lat: 39.89,
+    model: 'troy', flat: 1.9, town: 60,
     text: 'For ten years the Greeks camped on this plain and could not break the walls. Then Odysseus had a hollow wooden horse built and left on the beach as a gift. The Trojans dragged it inside. The Odyssey begins the morning after.',
   },
   {
@@ -182,12 +185,12 @@ export const SITES = [
   },
   {
     id: 'rhodes', name: 'Rhodes', greek: 'Ῥόδος', kind: 'heroes', tier: 1, lon: 28.225, lat: 36.445,
-    model: 'colossus', flat: 1.0,
+    model: 'colossus', flat: 1.0, town: 36, walls: true,
     text: 'The island Helios, the sun, chose for himself when the gods divided the world. The Rhodians later raised a bronze statue of him more than thirty metres tall beside their harbour, one of the seven wonders.',
   },
   {
     id: 'knossos', name: 'Knossos', greek: 'Κνωσός', kind: 'monsters', tier: 1, lon: 25.163, lat: 35.298,
-    model: 'labyrinth', flat: 1.9,
+    model: 'labyrinth', flat: 1.9, town: 60,
     text: 'King Minos had Daedalus build a maze under his palace to hold the Minotaur, half man and half bull, and fed it with young Athenians. Theseus killed it and found his way out by following a thread Ariadne gave him.',
   },
   {
@@ -212,14 +215,14 @@ export const SITES = [
   },
   {
     id: 'chios', name: 'Chios', greek: 'Χίος', kind: 'heroes', tier: 3, lon: 26.08, lat: 38.4,
-    model: 'homer', flat: 0.7,
+    model: 'homer', flat: 0.7, town: 16,
     text: 'Seven cities claimed to be the birthplace of Homer. Chios had the strongest case and a guild of singers, the Homeridae, who called themselves his descendants. Everything on this map was first sung by someone like him.',
   },
 
   // ------------------------------------------------------------- odyssey ----
   {
     id: 'ismarus', name: 'Ismarus', greek: 'Ἴσμαρος', kind: 'odyssey', tier: 2, lon: 25.51, lat: 40.87,
-    model: 'ismarus', flat: 1.1,
+    model: 'ismarus', flat: 1.1, town: 26, walls: true,
     text: 'City of the Cicones. Odysseus raided it straight after leaving Troy. His men stayed on the beach drinking, the Cicones came back with their neighbours, and he lost six men from every ship.',
   },
   {
@@ -244,7 +247,7 @@ export const SITES = [
   },
   {
     id: 'laestrygonia', name: 'Telepylos', greek: 'Τηλέπυλος', kind: 'odyssey', tier: 2, lon: 13.6, lat: 41.27,
-    model: 'giants', flat: 1.2,
+    model: 'giants', flat: 1.2, town: 14,
     text: 'Harbour of the Laestrygonians, man-eating giants. Eleven ships moored inside the cliffs and were smashed with boulders; the crews were speared like fish. Only Odysseus, who had tied up outside, got away. The Romans placed it at Formiae.',
   },
   {
@@ -279,17 +282,20 @@ export const SITES = [
   },
   {
     id: 'scheria', name: 'Scheria', greek: 'Σχερία', kind: 'odyssey', tier: 2, lon: 19.86, lat: 39.62,
-    model: 'scheria', flat: 1.2,
+    model: 'scheria', flat: 1.2, town: 36, walls: true,
     text: 'Land of the Phaeacians, the best sailors alive. Odysseus was thrown ashore naked and found by the princess Nausicaa. At her father\'s table he finally told the story of his wanderings, and they carried him home asleep. Tradition says Corfu.',
   },
   {
     id: 'ithaca', name: 'Ithaca', greek: 'Ἰθάκη', kind: 'odyssey', tier: 1, lon: 20.69, lat: 38.4,
-    model: 'ithaca', flat: 0.9,
+    model: 'ithaca', flat: 0.9, town: 18,
     text: 'Home. Twenty years after he left, Odysseus came back disguised as a beggar and found his hall full of suitors pressing his wife Penelope to remarry. He strung the bow only he could string, and that was the end of them.',
   },
 ];
 
 // The voyage, in order. `site` is where the ship puts in.
+// The minor places follow the great ones (see minor.js).
+SITES.push(...MINOR_SITES);
+
 export const VOYAGE = [
   {
     site: 'troy', title: 'The sack of Troy', book: 'Before the poem',

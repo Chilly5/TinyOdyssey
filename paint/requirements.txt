@@ -1,0 +1,11 @@
+# The painter (paint.py, tiles.py). Install PyTorch first, from the index that matches your GPU:
+#   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+diffusers>=0.43
+transformers>=5.0
+accelerate
+safetensors
+sentencepiece
+protobuf
+huggingface_hub
+pillow
+numpy
