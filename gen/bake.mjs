@@ -124,6 +124,14 @@ function surface(r, g, b, ny) {
 }
 
 // A landmark that keeps its triangles and samples them straight into a picture when asked.
+//
+// It also keeps its own light. The sun stands in the north-west, 41 degrees up (the sweep in region.mjs):
+// a shadow runs SUN voxels east and as many south for each voxel of height. Two maps over the model say
+// what that means for any point of it: `sun`, the highest thing on each ray of sunlight, and `top`, the
+// highest thing straight overhead. From them a roof shades the wall under its eaves, a column the floor
+// beside it, a statue its plinth, and the whole of it the ground it stands on (.shadow).
+const SUN = 0.8;
+const LIT = []; // the landmarks whose light is in memory: a few at a time, for the maps are large
 function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, snap }) {
   const F = snap;
   const meshes = [{ pos: g.pos, col: g.col, n: g.n, el: null, glow: false }];
@@ -131,7 +139,7 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
     const geo = d.mesh.geometry;
     meshes.push({ pos: geo.attributes.position.array, col: geo.attributes.color.array, n: geo.attributes.position.count, el: d.mesh.matrixWorld.elements, glow: d.glow });
   }
-  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, yTop = 0;
   const P = (out, m, i) => {
     let x = m.pos[i], y = m.pos[i + 1], z = m.pos[i + 2];
     const el = m.el;
@@ -149,13 +157,93 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
     if (a[0] > x1) x1 = a[0];
     if (a[2] < z0) z0 = a[2];
     if (a[2] > z1) z1 = a[2];
+    if (a[1] > yTop) yTop = a[1];
   }
+  // Its trees: which stamp, and where it stands (voxels from the model's anchor).
+  const trees = treeList.map((t) => {
+    const [list, ramps0] = TREES[t.name] || TREES.oak;
+    const idx = Math.min(list.length - 1, Math.max(0, Math.round((t.scale - 0.7) / 0.14)));
+    const ox = Math.round(t.x * modelPx) + (F >> 1), oy = Math.round(t.y * modelPx), oz = Math.round(t.z * modelPx) + (F >> 1);
+    x0 = Math.min(x0, ox - 14 * F); x1 = Math.max(x1, ox + 14 * F);
+    z0 = Math.min(z0, oz - 14 * F); z1 = Math.max(z1, oz + 14 * F);
+    yTop = Math.max(yTop, oy + 30 * F);
+    return { st: () => list[idx % list.length].at(F), ramps0, ox, oy, oz };
+  });
+  if (x0 > x1) { x0 = x1 = z0 = z1 = 0; }
   const course = Math.max(3, Math.round(F * 0.7)), tile = Math.max(2, Math.round(F * 0.42));
+  const BIAS = 1.5 + F * 0.1; // how much higher something must stand to count as in the way
+  const reach = Math.ceil(yTop * SUN) + 6;
+  // The largest (a mountain and all that stands on it) keep their light at half or a quarter the grain:
+  // the maps of a landmark thousands of pixels across would not fit in memory, nor be worth the making.
+  const spread = (x1 - x0 + reach) * (z1 - z0 + reach);
+  const sh = spread > 3e7 ? 2 : spread > 8e6 ? 1 : 0, grain = 1 << sh;
+
+  let maps = null;
+  const release = () => { maps = null; };
+  const light = () => {
+    if (maps) return maps;
+    const pad = 4;
+    const hx0 = Math.floor(x0) - pad, hz0 = Math.floor(z0) - pad;
+    const hw = ((Math.ceil(x1) + pad + 1 - hx0) >> sh) + 1, hd = ((Math.ceil(z1) + pad + 1 - hz0) >> sh) + 1;
+    const sw = hw + (reach >> sh) + 1, sd = hd + (reach >> sh) + 1;
+    const top = new Int16Array(hw * hd).fill(-32000), sun = new Int16Array(sw * sd).fill(-32000);
+    const put = (lx, ly, lz) => {
+      const i = (lx - hx0) >> sh, j = (lz - hz0) >> sh;
+      if (i >= 0 && j >= 0 && i < hw && j < hd && ly > top[j * hw + i]) top[j * hw + i] = ly;
+      const q = Math.round(ly * SUN), si = (lx - hx0 + q) >> sh, sj = (lz - hz0 + q) >> sh;
+      if (si >= 0 && sj >= 0 && si < sw && sj < sd && ly > sun[sj * sw + si]) sun[sj * sw + si] = ly;
+    };
+    for (const m of meshes) {
+      if (m.glow) continue; // fire throws no shadow
+      for (let i = 0; i < m.n * 3; i += 9) { // every face, whichever way it looks
+        P(a, m, i); P(b, m, i + 3); P(c, m, i + 6);
+        const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2];
+        const e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
+        const n1 = Math.max(1, Math.ceil(Math.hypot(e1x, e1y, e1z) / (0.45 * grain)));
+        const n2 = Math.max(1, Math.ceil(Math.hypot(e2x, e2y, e2z) / (0.45 * grain)));
+        for (let p1 = 0; p1 <= n1; p1++) {
+          const u = p1 / n1;
+          const jm = Math.round(n2 * (1 - u));
+          for (let p2 = 0; p2 <= jm; p2++) {
+            const v = p2 / n2;
+            put(Math.round(a[0] + e1x * u + e2x * v), Math.round(a[1] + e1y * u + e2y * v), Math.round(a[2] + e1z * u + e2z * v));
+          }
+        }
+      }
+    }
+    for (const t of trees) {
+      const st = t.st();
+      for (let v = 0; v < st.n; v++) put(t.ox + st.dx[v], t.oy + st.dy[v], t.oz + st.dz[v]);
+    }
+    maps = { top, sun, hx0, hz0, hw, hd, sw, sd };
+    LIT.push(release);
+    if (LIT.length > 3) LIT.shift()();
+    return maps;
+  };
+
   return {
     site: s, bx, by, bz,
+    // Does its shadow reach this piece of the picture (fine voxels)? If so, a function that says whether
+    // the point (x, height, z) lies in it. Ground lower than its foot is reached further off; allow for some.
+    shadow(X0, Z0, X1, Z1) {
+      if (yTop < 3 * F) return null;
+      const far = reach + 48 * F;
+      if (bx + x1 + far < X0 || bx + x0 - 8 >= X1 || bz + z1 + far < Z0 || bz + z0 - 8 >= Z1) return null;
+      return (fx, y, fz) => {
+        const lx = fx - bx, lz = fz - bz;
+        if (lx < x0 - 8 || lz < z0 - 8 || lx > x1 + far || lz > z1 + far) return false;
+        const m = light();
+        const ly = y - by, q = Math.round(ly * SUN);
+        const si = (lx - m.hx0 + q) >> sh, sj = (lz - m.hz0 + q) >> sh;
+        return si >= 0 && sj >= 0 && si < m.sw && sj < m.sd && m.sun[sj * m.sw + si] > ly + BIAS + (grain - 1) * 1.5;
+      };
+    },
     draw(ctx) {
       const { img, zb, iw, X0, Z0, X1, Z1, iy0, shaded, toB, look } = ctx;
       if (bx + x1 + 40 * F < X0 || bx + x0 - 40 * F >= X1 || bz + z1 + 40 * F < Z0 || bz + z0 - 40 * F >= Z1) return;
+      const { top, sun, hx0, hz0, hw, hd, sw, sd } = light();
+      const eave = 0.1 * modelPx; // this close under something, a wall is in its deepest shade
+      const out = 2 + Math.round(F * 0.2); // how far in front of a wall to look up
       for (const m of meshes) {
         for (let i = 0; i < m.n * 3; i += 9) {
           P(a, m, i); P(b, m, i + 3); P(c, m, i + 6);
@@ -170,7 +258,9 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
           const r8 = toSRGB(m.col[i]), g8 = toSRGB(m.col[i + 1]), b8 = toSRGB(m.col[i + 2]);
           const ramp = look.ramp(rampFrom(r8, g8, b8));
           const level0 = m.glow ? 3 : levelOf(nx, ny, nz);
-          const lit = m.glow || ny <= 0.6; // only upward faces take cast shadows
+          const flat = ny > 0.6; // a floor, a roof: what a shadow falls on from above
+          const sunny = !m.glow && -0.53 * nx + 0.66 * ny - 0.53 * nz > 0.3; // turned to the sun: a top, a west face
+          const wx = Math.round(nx * out), wz = Math.round(nz * out), sx = Math.round(nx * 1.5), sy = Math.round(ny * 1.5), sz = Math.round(nz * 1.5);
           const kind = F >= 4 && look.texture && !m.glow ? surface(r8, g8, b8, ny) : -1; // -1: plain
           const n1 = Math.max(1, Math.ceil(Math.hypot(e1x, e1y, e1z) / 0.45));
           const n2 = Math.max(1, Math.ceil(Math.hypot(e2x, e2y, e2z) / 0.45));
@@ -179,11 +269,11 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
             const jm = Math.round(n2 * (1 - u));
             for (let p2 = 0; p2 <= jm; p2++) {
               const v = p2 / n2;
-              const gx = bx + Math.round(a[0] + e1x * u + e2x * v - nx * 0.2);
+              const lx = Math.round(a[0] + e1x * u + e2x * v - nx * 0.2), gx = bx + lx;
               if (gx < X0 || gx >= X1) continue;
-              const gz = bz + Math.round(a[2] + e1z * u + e2z * v - nz * 0.2);
+              const lz = Math.round(a[2] + e1z * u + e2z * v - nz * 0.2), gz = bz + lz;
               if (gz < Z0 || gz >= Z1) continue;
-              const gy = by + Math.round(a[1] + e1y * u + e2y * v - ny * 0.2);
+              const ly = Math.round(a[1] + e1y * u + e2y * v - ny * 0.2), gy = by + ly;
               const p = (Math.round(KZ * gz - KY * gy) - iy0) * iw + gx - X0;
               const zr = gz - Z0 + 1;
               if (zb[p] > zr) continue;
@@ -207,21 +297,42 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
                 else if (n < 0.17) level--;
                 else if (hash2(gx >> 1, (gy + gz) >> 1, 175) < 0.03) level--;
               }
-              if (!lit && shaded(toB(gx), toB(gz), (gy / F) * 8 + 6)) level -= 2;
-              img[p] = ramp[level < 0 ? 0 : level > 4 ? 4 : level];
+              if (!m.glow) {
+                // Its own shadows. A face turned to the sun: is something higher on the ray that reaches it?
+                let dark = 0;
+                if (sunny) {
+                  const q = Math.round((ly + sy) * SUN), si = (lx + sx - hx0 + q) >> sh, sj = (lz + sz - hz0 + q) >> sh;
+                  if (si >= 0 && sj >= 0 && si < sw && sj < sd && sun[sj * sw + si] > ly + sy + BIAS + (grain - 1) * 1.5) dark = 2;
+                }
+                if (dark === 0) {
+                  // Is it under cover: a porch floor under its roof, a wall under its eaves?
+                  const ci = (lx + (flat ? 0 : wx * grain) - hx0) >> sh, cj = (lz + (flat ? 0 : wz * grain) - hz0) >> sh;
+                  if (ci >= 0 && cj >= 0 && ci < hw && cj < hd) {
+                    const over = top[cj * hw + ci] - ly;
+                    if (over > BIAS + (flat ? F : 0)) dark = flat || over > eave ? 1 : 2;
+                  }
+                  // And the shadow of whatever else stands near: a hill, a house, a tree.
+                  if (dark === 0 && flat && shaded(toB(gx), toB(gz), (gy / F) * 8 + 6)) dark = 2;
+                }
+                level -= dark;
+              }
+              const col = ramp[level < 0 ? 0 : level > 4 ? 4 : level];
+              img[p] = col;
               zb[p] = zr;
+              // A slope that falls towards the camera steps down more than a pixel at a time: it takes the
+              // pixel below as well, or the wall behind shows through it in dashes (as for the stamps in fine.mjs).
+              if (F > 1 && nz > 0.1 && ny > 0.1 && p + iw < img.length && zb[p + iw] < zr) { img[p + iw] = col; zb[p + iw] = zr; }
             }
           }
         }
       }
       // Its trees, each rebuilt at this scale.
-      for (const t of treeList) {
-        const [list, ramps0] = TREES[t.name] || TREES.oak;
-        const idx = Math.min(list.length - 1, Math.max(0, Math.round((t.scale - 0.7) / 0.14)));
-        const st = list[idx % list.length].at(F);
-        const ramps = look.ramps(ramps0);
-        const ox = bx + Math.round(t.x * modelPx) + (F >> 1), oy = by + Math.round(t.y * modelPx), oz = bz + Math.round(t.z * modelPx) + (F >> 1);
+      for (const t of trees) {
+        const ox = bx + t.ox, oy = by + t.oy, oz = bz + t.oz;
         if (oz + 24 * F < Z0 || oz - 24 * F >= Z1 || ox + 24 * F < X0 || ox - 24 * F >= X1) continue;
+        const st = t.st();
+        const ramps = look.ramps(t.ramps0);
+        const lvs = look.texture ? st.lv : st.lp;
         for (let v = 0; v < st.n; v++) {
           const gz = oz + st.dz[v];
           if (gz < Z0 || gz >= Z1) continue;
@@ -231,10 +342,13 @@ function directLandmark({ s, bx, by, bz, g, still, treeList, TREES, modelPx, sna
           const p = (Math.round(KZ * gz - KY * gy) - iy0) * iw + gx - X0;
           const zr = gz - Z0 + 1;
           if (zb[p] > zr) continue;
-          const c = ramps[st.part[v]][(look.texture ? st.lv : st.lp)[v]];
-          img[p] = c;
+          let level = lvs[v];
+          const q = Math.round((gy - by + 2) * SUN), si = (gx - bx - hx0 + q) >> sh, sj = (gz - bz - hz0 + q) >> sh;
+          if (si >= 0 && sj >= 0 && si < sw && sj < sd && sun[sj * sw + si] > gy - by + 2 + BIAS + F) level = level > 2 ? level - 2 : 0; // in the model's shadow
+          const col = ramps[st.part[v]][level];
+          img[p] = col;
           zb[p] = zr;
-          if (F > 1 && p + iw < img.length && zb[p + iw] < zr) { img[p + iw] = c; zb[p + iw] = zr; } // its front: see fine.mjs
+          if (F > 1 && p + iw < img.length && zb[p + iw] < zr) { img[p + iw] = col; zb[p + iw] = zr; } // its front: see fine.mjs
         }
       }
     },

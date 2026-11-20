@@ -135,6 +135,9 @@ export class Geo {
   cyl(x, y, z, r0, r1, h, sides, color, opts = {}) {
     const top = opts.top || color;
     const phase = opts.phase || 0;
+    // Round things are asked for with a handful of sides, from when a model was a few pixels across.
+    // Three and four sides mean a prism or a pyramid and stay; anything more is meant to be round.
+    if (sides >= 5 && sides <= 10 && !opts.exact) sides *= 2;
     for (let i = 0; i < sides; i++) {
       const a0 = phase + (i / sides) * Math.PI * 2;
       const a1 = phase + ((i + 1) / sides) * Math.PI * 2;
@@ -163,10 +166,155 @@ export class Geo {
       const pz = p[0] * sr + p[2] * cr;
       return [x + px * rx, y + p[1] * ry, z + pz * rz];
     };
+    const N = (p, q) => {
+      const v = [p[0] + q[0], p[1] + q[1], p[2] + q[2]], l = Math.hypot(v[0], v[1], v[2]);
+      return [v[0] / l, v[1] / l, v[2] / l];
+    };
+    for (const f of ICO.f) { // each of the twenty faces as four, pushed out to the round
+      const a = ICO.v[f[0]], b = ICO.v[f[1]], c = ICO.v[f[2]];
+      const ab = N(a, b), bc = N(b, c), ca = N(c, a);
+      for (const [p, q, r] of [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]) {
+        const down = p[1] + q[1] + r[1] < -1.2;
+        this.tri(P(p), P(q), P(r), dark && down ? dark : color);
+      }
+    }
+    return this;
+  }
+
+  // Triangle a, b, c, turned whichever way makes it face away from the point o (somewhere inside the
+  // shape it belongs to). Lets a rounded shape be built without minding the order of its corners.
+  triOut(a, b, c, color, o) {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    if (nx * nx + ny * ny + nz * nz < 1e-16) return this;
+    const d = nx * (a[0] + b[0] + c[0] - 3 * o[0]) + ny * (a[1] + b[1] + c[1] - 3 * o[1]) + nz * (a[2] + b[2] + c[2] - 3 * o[2]);
+    if (d >= 0) this.tri(a, b, c, color);
+    else this.tri(a, c, b, color);
+    return this;
+  }
+
+  // A smooth ball, or an egg when the radii differ: seg faces round it. opts.from / opts.to keep only a
+  // part of it, measured from its underside (0) to its crown (1); opts.dark colours what faces down.
+  ball(x, y, z, rx, ry, rz, color, opts = {}) {
+    const seg = opts.seg || 10, rings = opts.rings || Math.max(4, Math.round(seg * 0.6));
+    const lo = opts.from ?? 0, hi = opts.to ?? 1;
+    const rot = opts.rot || 0, cr = Math.cos(rot), sr = Math.sin(rot);
+    const o = [x, y, z];
+    const P = (i, j) => {
+      const t = Math.PI * (lo + ((hi - lo) * j) / rings), ph = (i / seg) * Math.PI * 2;
+      const px = Math.sin(t) * Math.cos(ph) * rx, pz = Math.sin(t) * Math.sin(ph) * rz;
+      return [x + px * cr - pz * sr, y - Math.cos(t) * ry, z + px * sr + pz * cr];
+    };
+    for (let j = 0; j < rings; j++) {
+      const col = opts.dark && (lo + ((hi - lo) * (j + 0.5)) / rings) < 0.3 ? opts.dark : color;
+      for (let i = 0; i < seg; i++) {
+        const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1);
+        this.triOut(a, b, c, col, o);
+        this.triOut(a, c, d, col, o);
+      }
+    }
+    return this;
+  }
+
+  // A limb: a round bar from point a to point b, r0 thick at a and r1 at b, its ends rounded off.
+  limb(a, b, r0, r1, color, opts = {}) {
+    const sides = opts.sides || 8;
+    let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+    const len = Math.hypot(dx, dy, dz) || 1e-6;
+    dx /= len; dy /= len; dz /= len;
+    // Two directions square to the bar and to each other.
+    let ux = Math.abs(dy) < 0.9 ? 0 : 1, uy = Math.abs(dy) < 0.9 ? 1 : 0, uz = 0;
+    let vx = dy * uz - dz * uy, vy = dz * ux - dx * uz, vz = dx * uy - dy * ux;
+    const vl = Math.hypot(vx, vy, vz);
+    vx /= vl; vy /= vl; vz /= vl;
+    ux = vy * dz - vz * dy; uy = vz * dx - vx * dz; uz = vx * dy - vy * dx;
+    const ring = (p, r, i) => {
+      const t = (i / sides) * Math.PI * 2, c = Math.cos(t) * r, s = Math.sin(t) * r;
+      return [p[0] + ux * c + vx * s, p[1] + uy * c + vy * s, p[2] + uz * c + vz * s];
+    };
+    for (let i = 0; i < sides; i++) {
+      const a0 = ring(a, r0, i), a1 = ring(a, r0, i + 1), b0 = ring(b, r1, i), b1 = ring(b, r1, i + 1);
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+      // Each face is turned away from the bar's own axis beside it, so a strong taper cannot turn it inside out.
+      const ref = (p, q) => {
+        const cx = (p[0] + q[0]) / 2 - a[0], cy = (p[1] + q[1]) / 2 - a[1], cz = (p[2] + q[2]) / 2 - a[2];
+        const t = cx * dx + cy * dy + cz * dz;
+        return [a[0] + dx * t, a[1] + dy * t, a[2] + dz * t];
+      };
+      this.triOut(a0, a1, b1, color, ref(a0, b1));
+      this.triOut(a0, b1, b0, color, ref(a0, b1));
+      void mid;
+    }
+    if (!opts.open) {
+      if (r0 > 0) this.ball(a[0], a[1], a[2], r0, r0, r0, color, { seg: sides, rings: 4 });
+      if (r1 > 0) this.ball(b[0], b[1], b[2], r1, r1, r1, color, { seg: sides, rings: 4 });
+    }
+    return this;
+  }
+
+  // A shape turned on a lathe about the upright through (x, z). profile: [[radius, height], ...] from the
+  // bottom up. opts.flute pulls every other corner in by that fraction (the flutes of a column);
+  // opts.sx / opts.sz stretch it into an oval; opts.top colours the cap, opts.bottom closes the underside.
+  lathe(x, y, z, profile, sides, color, opts = {}) {
+    const phase = opts.phase || 0, flute = opts.flute || 0, sx = opts.sx || 1, sz = opts.sz || 1;
+    const P = (k, i) => {
+      const t = phase + (i / sides) * Math.PI * 2;
+      const r = profile[k][0] * (flute && i % 2 ? 1 - flute : 1);
+      return [x + Math.cos(t) * r * sx, y + profile[k][1], z + Math.sin(t) * r * sz];
+    };
+    for (let k = 0; k < profile.length - 1; k++) {
+      const o = [x, y + (profile[k][1] + profile[k + 1][1]) / 2, z];
+      const col = opts.cols ? opts.cols[k] || color : color;
+      for (let i = 0; i < sides; i++) {
+        const a = P(k, i), b = P(k, i + 1), c = P(k + 1, i + 1), d = P(k + 1, i);
+        this.triOut(a, b, c, col, o);
+        this.triOut(a, c, d, col, o);
+      }
+    }
+    const last = profile.length - 1;
+    if (profile[last][0] > 0) {
+      const c = [x, y + profile[last][1], z], o = [x, y + profile[last][1] - 1, z];
+      for (let i = 0; i < sides; i++) this.triOut(c, P(last, i), P(last, i + 1), opts.top || color, o);
+    }
+    if (opts.bottom && profile[0][0] > 0) {
+      const c = [x, y + profile[0][1], z], o = [x, y + profile[0][1] + 1, z];
+      for (let i = 0; i < sides; i++) this.triOut(c, P(0, i), P(0, i + 1), color, o);
+    }
+    return this;
+  }
+
+  // A boulder: a ball of eighty flat faces, knocked about so that no two are alike. The faces that look
+  // down take the dark colour, the steep ones a tone between.
+  rock(x, y, z, rx, ry, rz, seed, color, dark = color) {
+    let s = (seed * 2654435761) >>> 0;
+    const jit = new Map();
+    const J = (p) => { // the same knock for a corner whichever face asks
+      const key = Math.round(p[0] * 1000) + ',' + Math.round(p[1] * 1000) + ',' + Math.round(p[2] * 1000);
+      let v = jit.get(key);
+      if (v === undefined) {
+        s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x9e3779b9) >>> 0;
+        v = 0.78 + ((s >>> 8) / 16777216) * 0.44;
+        jit.set(key, v);
+      }
+      return v;
+    };
+    const N = (p) => {
+      const l = Math.hypot(p[0], p[1], p[2]);
+      return [p[0] / l, p[1] / l, p[2] / l];
+    };
+    const V = (p) => {
+      const k = J(p);
+      return [x + p[0] * rx * k, y + Math.max(-0.35, p[1]) * ry * k, z + p[2] * rz * k]; // flat underneath, to sit on the ground
+    };
+    const o = [x, y, z];
+    const mid = [(color[0] + dark[0]) / 2, (color[1] + dark[1]) / 2, (color[2] + dark[2]) / 2];
     for (const f of ICO.f) {
       const a = ICO.v[f[0]], b = ICO.v[f[1]], c = ICO.v[f[2]];
-      const down = a[1] + b[1] + c[1] < -0.9;
-      this.tri(P(a), P(b), P(c), dark && down ? dark : color);
+      const ab = N([a[0] + b[0], a[1] + b[1], a[2] + b[2]]), bc = N([b[0] + c[0], b[1] + c[1], b[2] + c[2]]), ca = N([c[0] + a[0], c[1] + a[1], c[2] + a[2]]);
+      for (const [p, q, r] of [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]) {
+        const up = (p[1] + q[1] + r[1]) / 3;
+        this.triOut(V(p), V(q), V(r), up < -0.2 ? dark : up < 0.25 ? mid : color, o);
+      }
     }
     return this;
   }

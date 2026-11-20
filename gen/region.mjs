@@ -506,17 +506,22 @@ export function createRenderer({ fields, sites, stamps, S, rivers = [], landmark
         if (t > sh[j * ew + i]) sh[j * ew + i] = t;
       }
     }
+    // A finer render gives each landmark a sharp shadow of its own (gen/bake.mjs), so it wants the shade
+    // of everything else kept apart.
+    const sh0 = opts.layout ? Int16Array.from(sh) : null;
     for (const lm of landmarks) lm.stampTops?.(sh, ex0, ez0, ew, ed);
-    for (let j = 1; j < ed; j++) {
-      for (let i = 1; i < ew; i++) {
-        const k = j * ew + i, v = sh[k - ew - 1] - DROP8;
-        if (v > sh[k]) sh[k] = v;
+    for (const m of sh0 ? [sh, sh0] : [sh]) {
+      for (let j = 1; j < ed; j++) {
+        for (let i = 1; i < ew; i++) {
+          const k = j * ew + i, v = m[k - ew - 1] - DROP8;
+          if (v > m[k]) m[k] = v;
+        }
       }
     }
     // Shadow ceiling arriving at cell (i, j), x8. Anything below it is in shade.
     const ceilAt = (i, j) => (i > 0 && j > 0 ? sh[(j - 1) * ew + i - 1] - DROP8 : -30000);
 
-    if (opts.layout) return { lay: { ex0, ez0, ew, ed, HF, EL, H, mat, lvl, flag, lean, wlean, inst, sh } };
+    if (opts.layout) return { lay: { ex0, ez0, ew, ed, HF, EL, H, mat, lvl, flag, lean, wlean, inst, sh, sh0 } };
 
     // --- 7. Flatten to pixels -------------------------------------------------------------
     const iw = gx1 - gx0;

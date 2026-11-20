@@ -54,14 +54,16 @@ export function createLife(viewer, M, data, calm) {
       path, kind, u: U[kind], speed: (o.speed || k[0]) * (0.85 + rnd() * 0.3), step: k[1],
       phase: o.phase ?? rnd() * path.total * 2, loop: !!o.loop, side: o.side ?? (rnd() - 0.5) * 2.4, gap: o.gap || 0,
       idle: o.idle || 0, air: o.air || 0, x: 0, y: 0, z: -1, k: 0, f: 0,
+      // For whoever asks about them (people.js): a number, and where their path lies and with whom.
+      id: movers.length, ctx: o.ctx || null, who: null,
       // Most people go indoors at night; a few stay out, and so do the animals, the boats and the monsters.
       home: HOMEBODY.has(kind) && rnd() < 0.72,
     };
     movers.push(m);
     return m;
   };
-  const follow = (leader, kind, gap, side = 0) => {
-    const m = add(leader.path, kind, { phase: leader.phase, loop: leader.loop, side: leader.side + side, gap, idle: leader.idle, air: leader.air });
+  const follow = (leader, kind, gap, side = 0, role = 'with') => {
+    const m = add(leader.path, kind, { phase: leader.phase, loop: leader.loop, side: leader.side + side, gap, idle: leader.idle, air: leader.air, ctx: { ...leader.ctx, role, lead: leader } });
     if (m) m.speed = leader.speed;
     return m;
   };
@@ -82,18 +84,18 @@ export function createLife(viewer, M, data, calm) {
     const n = Math.max(1, Math.min(16, Math.round((r.path.total / 130) * (r.main ? 1.5 : 1))));
     for (let i = 0; i < n; i++) {
       const kind = pick(['man2', 22, 'merchant', 12, 'oxcart', 11, 'woman', 7, 'farmer', 10, 'rider', r.main ? 10 : 3, 'hoplite', 8, 'priest', 3, 'runner', 3, 'bard', 2, 'shepherd', 5, 'chariot', r.main ? 2 : 0]);
-      const lead = add(r.path, kind);
+      const lead = add(r.path, kind, { ctx: { where: 'road', from: r.from, to: r.to } });
       if (!lead) continue;
-      if (kind === 'merchant') follow(lead, 'donkey', 4.5);
-      else if (kind === 'hoplite') { follow(lead, 'hoplite', 3.4); follow(lead, 'hoplite', 6.8); if (rnd() < 0.5) follow(lead, 'hoplite', 10.2); }
-      else if (kind === 'shepherd') { for (let k = 0; k < 4; k++) follow(lead, rnd() < 0.7 ? 'sheep' : 'goat', -3 - k * 2.6, (rnd() - 0.5) * 3); }
-      else if (kind === 'man2' && rnd() < 0.3) follow(lead, 'woman2', 3.2, 1.4);
+      if (kind === 'merchant') follow(lead, 'donkey', 4.5, 0, 'pack');
+      else if (kind === 'hoplite') { follow(lead, 'hoplite', 3.4, 0, 'file'); follow(lead, 'hoplite', 6.8, 0, 'file'); if (rnd() < 0.5) follow(lead, 'hoplite', 10.2, 0, 'file'); }
+      else if (kind === 'shepherd') { for (let k = 0; k < 4; k++) follow(lead, rnd() < 0.7 ? 'sheep' : 'goat', -3 - k * 2.6, (rnd() - 0.5) * 3, 'flock'); }
+      else if (kind === 'man2' && rnd() < 0.3) follow(lead, 'woman2', 3.2, 1.4, 'spouse');
     }
   }
   // Heracles is always on his way to the next labour; Talos walks his rounds of Crete.
   const wanderer = (id, name, kind, wants) => {
     const r = roadPaths.filter((q) => wants.includes(q.from) || wants.includes(q.to)).sort((a, b) => b.path.total - a.path.total)[0];
-    const m = r && add(r.path, kind, { side: 0 });
+    const m = r && add(r.path, kind, { side: 0, ctx: { where: 'road', from: r.from, to: r.to } });
     if (m) named.push({ id, name, kind: 'ship', tier: 3, target: m, dy: 4 });
   };
   wanderer('heracles', 'Heracles', 'heracles', ['nemea', 'lerna', 'stymphalia', 'erymanthos']);
@@ -104,37 +106,37 @@ export function createLife(viewer, M, data, calm) {
     for (const st of t.streets) {
       const p = makePath(st);
       const n = Math.max(1, Math.min(4, Math.round(p.total / 30)));
-      for (let i = 0; i < n; i++) add(p, pick(['man', 24, 'woman', 20, 'woman2', 14, 'man2', 8, 'merchant', 8, 'priest', 5, 'farmer', 8, 'hoplite', 5, 'bard', 2, 'donkey', 4]), { side: (rnd() - 0.5) * 1.6 });
+      for (let i = 0; i < n; i++) add(p, pick(['man', 24, 'woman', 20, 'woman2', 14, 'man2', 8, 'merchant', 8, 'priest', 5, 'farmer', 8, 'hoplite', 5, 'bard', 2, 'donkey', 4]), { side: (rnd() - 0.5) * 1.6, ctx: { where: 'street', town: t.id } });
     }
     for (const loop of t.market || []) {
       const p = makePath(loop);
-      add(p, pick(['man', 3, 'woman', 3, 'woman2', 2, 'merchant', 2]), { loop: true, speed: 1.2 + rnd(), idle: 0.7 });
-      if (rnd() < 0.6) add(p, pick(['man', 3, 'woman', 3, 'priest', 1]), { loop: true, speed: 1.2 + rnd(), idle: 0.7 });
+      add(p, pick(['man', 3, 'woman', 3, 'woman2', 2, 'merchant', 2]), { loop: true, speed: 1.2 + rnd(), idle: 0.7, ctx: { where: 'market', town: t.id } });
+      if (rnd() < 0.6) add(p, pick(['man', 3, 'woman', 3, 'priest', 1]), { loop: true, speed: 1.2 + rnd(), idle: 0.7, ctx: { where: 'market', town: t.id } });
     }
     if (t.wall) {
       const p = makePath(t.wall);
       for (let i = 0; i < 3; i++) {
-        const lead = add(p, 'hoplite', { loop: true, phase: (i / 3) * p.total, side: 0 });
-        if (lead) follow(lead, 'hoplite', 3.4);
+        const lead = add(p, 'hoplite', { loop: true, phase: (i / 3) * p.total, side: 0, ctx: { where: 'wall', town: t.id } });
+        if (lead) follow(lead, 'hoplite', 3.4, 0, 'file');
       }
     }
     for (const fl of t.fields) {
       const p = makePath(fl.pts);
       if (fl.kind === 'ox') {
-        const lead = add(p, 'ox', { speed: 1.0, side: 0 });
-        if (lead) follow(lead, 'farmer', 4.2);
-      } else add(p, 'farmer_work', { side: 0, idle: 0.5 });
+        const lead = add(p, 'ox', { speed: 1.0, side: 0, ctx: { where: 'field', town: t.id } });
+        if (lead) follow(lead, 'farmer', 4.2, 0, 'plough');
+      } else add(p, 'farmer_work', { side: 0, idle: 0.5, ctx: { where: 'field', town: t.id } });
     }
-    for (const b of t.boats) add(makePath(b), rnd() < 0.5 ? 'skiff' : 'skiff2', { loop: true, side: 0, idle: 0.6 });
+    for (const b of t.boats) add(makePath(b), rnd() < 0.5 ? 'skiff' : 'skiff2', { loop: true, side: 0, idle: 0.6, ctx: { where: 'boat', town: t.id } });
   }
 
   // --- Herds, and the creatures that keep to their own country ---
   for (const h of data.herds) {
     const p = makePath(h.pts);
-    const lead = add(p, h.kind, { loop: true, idle: 0.75, side: 0 });
+    const lead = add(p, h.kind, { loop: true, idle: 0.75, side: 0, ctx: { where: 'herd', n: h.n, keeper: h.keeper } });
     if (!lead) continue;
-    for (let i = 1; i < h.n; i++) follow(lead, h.kind, (rnd() - 0.2) * 14, (rnd() - 0.5) * 12);
-    if (h.keeper) follow(lead, 'shepherd', 9, (rnd() - 0.5) * 8);
+    for (let i = 1; i < h.n; i++) follow(lead, h.kind, (rnd() - 0.2) * 14, (rnd() - 0.5) * 12, 'herd');
+    if (h.keeper) follow(lead, 'shepherd', 9, (rnd() - 0.5) * 8, 'keeper');
   }
   for (const c of data.myths) {
     const p = makePath(c.pts);
@@ -142,13 +144,13 @@ export function createLife(viewer, M, data, calm) {
     let lead = null;
     for (let i = 0; i < c.n; i++) {
       // A line is run there and back, abreast (the runners at Olympia); the rest go round a loop.
-      if (!lead) lead = add(p, c.kind, { loop: !c.line, side: c.line ? -(c.n - 1) * 1.3 : 0, air: c.air, idle: c.line || c.air || c.kind === 'chariot' || c.kind === 'hoplite' || c.kind === 'dancer' ? 0 : 0.5 });
-      else if (c.line) follow(lead, c.kind, (i % 2) * 0.8, i * 2.6);
-      else follow(lead, c.kind, i * spread, c.kind === 'dancer' || c.kind === 'hoplite' || c.kind === 'chariot' ? 0 : (rnd() - 0.5) * 9);
+      if (!lead) lead = add(p, c.kind, { ctx: { where: 'myth', name: c.name }, loop: !c.line, side: c.line ? -(c.n - 1) * 1.3 : 0, air: c.air, idle: c.line || c.air || c.kind === 'chariot' || c.kind === 'hoplite' || c.kind === 'dancer' ? 0 : 0.5 });
+      else if (c.line) follow(lead, c.kind, (i % 2) * 0.8, i * 2.6, 'band');
+      else follow(lead, c.kind, i * spread, c.kind === 'dancer' || c.kind === 'hoplite' || c.kind === 'chariot' ? 0 : (rnd() - 0.5) * 9, 'band');
     }
     if (lead && c.name) named.push({ id: c.kind, name: c.name, kind: 'monsters', tier: 3, target: lead, dy: 4 });
   }
-  for (const f of data.fishers) add(makePath(f), rnd() < 0.5 ? 'skiff' : 'skiff2', { loop: true, side: 0, idle: 0.6 });
+  for (const f of data.fishers) add(makePath(f), rnd() < 0.5 ? 'skiff' : 'skiff2', { loop: true, side: 0, idle: 0.6, ctx: { where: 'sea' } });
 
   // Where a mover is now. Loops go round; other paths are walked there and back.
   const place = (m, t) => {
@@ -181,13 +183,34 @@ export function createLife(viewer, M, data, calm) {
 
   const seen = [];
   let now = 0;
+  let watched = null; // the one the visitor is following, kept placed every frame like the named ones
+  const height = (m) => (m.u.sets[0].at[0][3] / m.u.sets[0].q) * 0.8; // roughly how tall it stands on the picture
   return {
     named,
     count: movers.length,
     update(t) {
       now = t;
       for (const n of named) place(n.target, t); // so their labels and the camera can follow them
+      if (watched) place(watched, t);
     },
+    // Whoever is nearest a point of the picture, within r map pixels of the middle of their body.
+    pick(x, y, r) {
+      const abed = viewer.night > 0.97;
+      let best = null, bd = r;
+      for (const m of movers) {
+        if (abed && m.home) continue;
+        const bx = m.path.box;
+        if (bx[2] + 40 < x || bx[0] - 40 > x || bx[3] + 40 < y || bx[1] - 60 - m.air > y) continue;
+        place(m, now);
+        const d = Math.hypot(m.x - x, m.y - m.air - height(m) * 0.5 - y);
+        if (d < bd) { bd = d; best = m; }
+      }
+      return best;
+    },
+    watch(m) { watched = m; },
+    height,
+    // How many people are about in a stretch of the picture (for the sound of them), counted from what was last drawn.
+    crowd: 0,
     // layer 0: everything on the ground and the water. layer 1: whatever flies.
     draw(d, b, layer) {
       const zd = viewer.zoom * viewer.dpr;
@@ -204,6 +227,7 @@ export function createLife(viewer, M, data, calm) {
         if (m.x < b[0] - mx || m.x > b[2] + mx || m.y < b[1] - my || m.y - m.air > b[3] + my) continue;
         seen.push(m);
       }
+      if (layer === 0) this.crowd = seen.length;
       if (!seen.length) return;
       seen.sort((p, q) => p.y - q.y);
       if (zd > 1.1) {

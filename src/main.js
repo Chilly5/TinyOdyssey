@@ -3,6 +3,7 @@ import { createActors, buildAtlas } from './actors.js';
 import { createLabels } from './labels.js';
 import { createLife } from './life.js';
 import { createSound } from './sound.js';
+import { createPeople } from './people.js';
 import { SITES, KINDS, VOYAGE } from './sites.js';
 import { lonLatToWorld } from './config.js';
 import { clamp } from './util.js';
@@ -25,6 +26,7 @@ async function boot() {
   const res = await fetch(`${BASE}manifest.json`, { cache: 'no-cache' });
   if (!res.ok) throw new Error(`manifest: ${res.status}`);
   const M = await res.json();
+  let people = null; // the little people, once their paths have loaded (life.js)
   const viewer = createViewer(canvas, M, BASE);
   // ?look=pixel shows the map in hard pixels like the sprites over it, ?look=smooth as it was painted.
   // The world can name its own (manifest.look). P switches between the two.
@@ -56,6 +58,7 @@ async function boot() {
         if (!data) return;
         const life = createLife(viewer, M, data, calm);
         actors.setLife(life);
+        people = life;
         lightUp(data.lights || []);
         for (const l of life.named) roaming[l.id] = labels.add(l);
         labels.sort();
@@ -108,7 +111,7 @@ async function boot() {
   lightUp([]);
 
   // ------------------------------------------------------------------- sound --
-  const sound = createSound();
+  const sound = createSound({ music: new URL('./audio/theme.mp3', import.meta.url).href });
   let seaField = null; // the builder's map of how far the shore is, read once the sound is first turned on
   function hearSea() {
     if (seaField) return;
@@ -131,7 +134,7 @@ async function boot() {
   };
   const towns = SITES.filter((s) => s.town);
   const musical = M.effects.filter((e) => e.t === 'glyph' && (e.g || 'note') === 'note');
-  const heard = { sea: 0, land: 0, town: 0, near: 0, night: 0, notes: 0 };
+  const heard = { sea: 0, land: 0, town: 0, near: 0, night: 0, notes: 0, zoom: 1, crowd: 0 };
   function listen(dt) {
     if (!sound.on) return;
     const b = viewer.bounds(), zd = viewer.zoom;
@@ -150,6 +153,9 @@ async function boot() {
     let notes = 0;
     if (zd > 1) for (const e of musical) if (e.x > b[0] && e.x < b[2] && e.y > b[1] && e.y < b[3]) notes = 1;
     heard.notes = notes;
+    heard.zoom = zd;
+    // The people in sight: a dozen is a busy street. (Until they have loaded, a town stands in for them.)
+    heard.crowd = people ? Math.min(1, people.crowd / 12) : heard.town;
     sound.update(dt, heard);
   }
   actors.onSplash = (x, y, size) => {
@@ -236,6 +242,7 @@ async function boot() {
   const sheets = { card: $('card'), atlas: $('atlas'), about: $('about') };
   let selected = null;
   function openSheet(name) {
+    if (name && met) unfollow(); // one card at a time
     for (const k of Object.keys(sheets)) sheets[k].hidden = k !== name;
     side.hidden = !name;
     $('btnAtlas').setAttribute('aria-pressed', String(name === 'atlas'));
@@ -319,16 +326,43 @@ async function boot() {
   function follow(id, thing) {
     const item = roaming[id] || thing;
     if (!item) return;
+    if (met && met.m !== item.target) part();
     if (!side.hidden) openSheet(null);
     following = { item, id: roaming[id] ? id : null };
     labels.select(following.id); // its name stays up however far out the view is
     goal.zoom = clamp(Math.max(goal.zoom, 1.6), viewer.minZoom, viewer.maxZoom);
   }
   function unfollow() {
+    part();
     if (!following) return;
     following = null;
     labels.select(selected);
   }
+
+  // Anyone on the map can be asked who they are (people.js). Their card stays up, and the map stays on
+  // them, until the visitor lets go.
+  const who = createPeople((id) => (siteById[id] ? siteById[id].name : null), (id) => !!(siteById[id] && siteById[id].town));
+  const whoEl = $('who'), whoMark = $('whoMark');
+  let met = null; // { m: the one being followed, p: who they are, shown: the line last written }
+  function meet(m) {
+    const p = who(m);
+    follow(null, { name: p.name, target: m, dy: 0 });
+    people.watch(m);
+    met = { m, p, shown: null };
+    $('whoName').textContent = p.name;
+    $('whoTitle').textContent = p.title;
+    $('whoLife').textContent = p.life;
+    whoEl.hidden = false;
+    goal.zoom = clamp(Math.max(goal.zoom, 9), viewer.minZoom, viewer.maxZoom); // close enough to see who it is
+  }
+  function part() {
+    if (!met) return;
+    met = null;
+    if (people) people.watch(null);
+    whoEl.hidden = true;
+    whoMark.hidden = true;
+  }
+  $('whoClose')?.addEventListener('click', unfollow);
 
   // ----------------------------------------------------------------- voyage --
   const vEl = $('voyage');
@@ -462,6 +496,12 @@ async function boot() {
       for (const sh of actors.ships) near(sh, sh.id, 3);
       for (const id of Object.keys(roaming)) near(roaming[id], id, 2);
       if (pick) { follow(pick[0], pick[1]); return; }
+    }
+    if (people && viewer.zoom >= 1.5) { // close enough to tell one person from the next
+      const b = viewer.bounds();
+      const mx = b[0] + ((x - rect.left) / rect.width) * (b[2] - b[0]), my = b[1] + ((y - rect.top) / rect.height) * (b[3] - b[1]);
+      const m = people.pick(mx, my, Math.max(2.4, 22 / viewer.zoom));
+      if (m) { meet(m); return; }
     }
     let best = null, bd = Infinity;
     for (const q of M.sites) {
@@ -597,6 +637,14 @@ async function boot() {
     viewer.render(clock, actors.draw);
     labels.update();
 
+    if (met) { // what they are doing changes with the light; the mark stays over their head
+      const indoors = met.m.home && viewer.night > 0.97;
+      const line = met.p.now(viewer.night, indoors);
+      if (line !== met.shown) $('whoNow').textContent = met.shown = line;
+      viewer.toScreen(met.m.x, met.m.y - met.m.air - people.height(met.m) - 1.2, at);
+      whoMark.hidden = indoors;
+      whoMark.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+    }
     if (readout) {
       const pct = `${Math.round((viewer.zoom / viewer.base) * 100)}%`;
       if (pct !== shownPct) readout.textContent = shownPct = pct;
@@ -610,5 +658,5 @@ async function boot() {
   }
   requestAnimationFrame(frame);
 
-  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound, setStyle, follow, actors, get following() { return following; } };
+  window.__tiny = { viewer, goal, voyage, siteById, place, select, startVoyage, showStop, manifest: M, sound, setTime, setSound, setStyle, follow, actors, meet, who, get people() { return people; }, get met() { return met; }, get following() { return following; } };
 }

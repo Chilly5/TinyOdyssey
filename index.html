@@ -125,6 +125,16 @@
   #about dd { margin: 0; }
 
   /* The voyage bar */
+  #who { grid-area: 2 / 1; align-self: end; justify-self: start; width: min(340px, 100%); }
+  #who[hidden] { display: none; }
+  #who .now { color: var(--sea); }
+  #who .let { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); }
+  #whoMark { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+  #whoMark[hidden] { display: none; }
+  #whoMark::after { content: ''; position: absolute; left: -7px; top: -14px; border: 7px solid transparent; border-top: 10px solid var(--gold);
+    filter: drop-shadow(0 2px 0 var(--shade)) drop-shadow(0 -1px 0 var(--shade)); animation: bob 0.9s steps(4) infinite alternate; }
+  @keyframes bob { from { transform: translateY(-5px); } to { transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { #whoMark::after { animation: none; } }
   #voyage { grid-area: 3 / 1 / 4 / 3; justify-self: center; width: min(680px, 100%); }
   #voyage[hidden] { display: none; }
   #voyage .top { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 2px solid var(--rule); }
@@ -154,6 +164,8 @@
     #tools { grid-area: 1 / 2; justify-self: end; gap: 6px; } /* beside the name, and onto a second row when the phone is narrow */
     #tools .btn span { display: none; }
     #tools .btn { width: 34px; padding: 0; justify-content: center; }
+    #who { grid-area: 3 / 1 / 4 / 3; width: 100%; max-height: 44vh; }
+    #who h2 { font-size: 24px; }
     #tools .btn.go { width: auto; padding: 4px 12px; }
     #brand { justify-self: start; align-self: start; }
     #zoom, #hint { display: none; }
@@ -180,6 +192,7 @@
 <!--page-->
 <canvas id="world" aria-label="Animated pixel-art map of mythological Greece. Drag to pan, scroll to zoom."></canvas>
 <div id="labels"></div>
+<div id="whoMark" hidden aria-hidden="true"></div>
 
 <div id="ui">
   <header id="brand" class="panel">
@@ -189,7 +202,7 @@
 
   <nav id="tools" aria-label="Map tools">
     <button class="btn go" id="btnVoyage" type="button" aria-label="Sail the Odyssey">Sail<span>&nbsp;the Odyssey</span></button>
-    <button class="btn" id="btnStyle" type="button" title="The style the picture is drawn in" aria-label="Picture style"><b aria-hidden="true">&#9638;</b><span>Pixel art</span></button>
+    <button class="btn" id="btnStyle" type="button" title="The style the picture is drawn in" aria-label="Picture style"><b aria-hidden="true">&#9638;</b><span>Terraces</span></button>
     <button class="btn" id="btnTime" type="button" title="Day and night come and go"><b aria-hidden="true">&#9680;</b><span>Day &amp; night</span></button>
     <button class="btn" id="btnSound" type="button" aria-pressed="false" title="Sound is off" aria-label="Sound"><b aria-hidden="true">&#9834;</b><span>Sound</span></button>
     <button class="btn" id="btnAtlas" type="button" aria-pressed="false" title="Atlas of places"><b aria-hidden="true">&#9776;</b><span>Atlas</span></button>
@@ -226,8 +239,8 @@
         <button class="btn icon" type="button" data-close aria-label="Close">&times;</button>
       </header>
       <div class="body">
-        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data. The whole scene is a 3D model made of small cubes, with every tree, town, road and temple in place, seen through one fixed camera. Each step of the zoom is its own picture of that model at a finer grain, so going closer does not enlarge anything: a house gains its door, then its shutters and the tiles of its roof. The sea, the ships, the monsters and the people going about their day are drawn live on top, and step behind the houses as they pass. A day lasts five minutes: at dusk the lamps come on and most people go indoors.</p>
-        <p>The picture comes in three styles: pixel art, clean stacked terraces, and an earlier version that an image model painted from the same scene.</p>
+        <p>A diorama of the Greek myths, set on the real Mediterranean. The coastlines, mountains and sea floor come from satellite elevation data. The whole scene is a 3D model made of small cubes, with every tree, town, road and temple in place, seen through one fixed camera. Each step of the zoom is its own picture of that model at a finer grain, so going closer does not enlarge anything: a house gains its door, then its shutters and the tiles of its roof. The sea, the ships, the monsters and the people going about their day are drawn live on top, and step behind the houses as they pass. Click any of them to learn who they are and what they are up to, and the map will follow them. A day lasts five minutes: at dusk the lamps come on and most people go indoors.</p>
+        <p>The picture comes in three styles: clean stacked terraces, pixel art, and an earlier version that an image model painted from the same scene. With the sound on, a song plays over the whole map and gives way, as you come closer, to the sea, the cicadas and the talk of a town.</p>
         <p>Where the ancient world argued about a location, which is most of the Odyssey, the map follows the tradition repeated most often and says so.</p>
         <dl>
           <dt>Terrain</dt><dd>SRTM, GMTED and ETOPO1 through Mapzen terrain tiles</dd>
@@ -235,14 +248,14 @@
           <dt>Painted style</dt><dd>Redrawn by FLUX.2 klein, an open image model, so treat its details as illustration.</dd>
           <dt>People, ships and monsters</dt><dd>About 45 small voxel models and the landmarks' own moving parts, built and rendered in Blender</dd>
           <dt>Sound</dt><dd>Made in the browser from noise and a few sine waves: sea, wind, birds, crickets, a lyre where the Muses are. Off until you turn it on.</dd>
-          <dt>Keys</dt><dd>Arrows or WASD move, + and &minus; zoom, V changes the style, N the time of day, M the sound</dd>
+          <dt>Keys</dt><dd>Arrows or WASD move, + and &minus; zoom, V changes the style, N the time of day, M the sound. Click anyone on the map to follow them and hear who they are</dd>
           <dt>Inspired by</dt><dd><a href="https://hexagonal.earth/" target="_blank" rel="noopener">hexagonal.earth</a> and the isometric city maps of <a href="https://isometric.nyc" target="_blank" rel="noopener">New York</a>, <a href="https://tiny.london" target="_blank" rel="noopener">London</a>, <a href="https://www.yadongxie.com/lab/singapore" target="_blank" rel="noopener">Singapore</a> and <a href="https://isometricsf.com" target="_blank" rel="noopener">San Francisco</a></dd>
         </dl>
       </div>
     </section>
   </aside>
 
-  <p id="hint">Drag to pan. Scroll or pinch to zoom, a long way. Click a name.</p>
+  <p id="hint">Drag to pan. Scroll or pinch to zoom, a long way. Click a name, or anyone you meet.</p>
 
   <div id="zoom">
     <output id="zoomPct" aria-label="Zoom level">100%</output>
@@ -250,6 +263,21 @@
     <button class="btn icon" id="zoomOut" type="button" aria-label="Zoom out">&minus;</button>
     <button class="btn icon" id="zoomFit" type="button" aria-label="Show the whole map" title="Whole map">&#9635;</button>
   </div>
+
+  <section id="who" class="panel sheet" hidden aria-live="polite">
+    <header>
+      <div>
+        <span class="kind" id="whoTitle"></span>
+        <h2 id="whoName"></h2>
+      </div>
+      <button class="btn icon" type="button" id="whoClose" aria-label="Stop following">&times;</button>
+    </header>
+    <div class="body">
+      <p class="now" id="whoNow"></p>
+      <p id="whoLife"></p>
+      <p class="let">Following. Drag the map to let go.</p>
+    </div>
+  </section>
 
   <section id="voyage" class="panel" hidden aria-live="polite">
     <div class="top">

@@ -52,7 +52,8 @@ export const FULL = [1, 2, 4], SPARSE = [8, 16];
 // What was made is noted in out/scale-<F>*.json; pyramidOf() reads the notes back as one pyramid.
 const REACH = 330; // coarse rows: nothing stands so tall that it shows further north of its foot than this
 
-export function buildPyramid({ base, fine, look, out, places, lap = () => {}, only = null, rows = null, part = null }) {
+// keep: add to what is there instead of clearing the level first (a few places drawn again); tag: what to call the note.
+export function buildPyramid({ base, fine, look, out, places, lap = () => {}, only = null, rows = null, part = null, keep = false, tag: noteTag = null }) {
   const { GW, GD, IW, IH, OY, MAXTOP } = base;
   const full = FULL, sparse = SPARSE;
   fs.mkdirSync(out, { recursive: true });
@@ -60,7 +61,7 @@ export function buildPyramid({ base, fine, look, out, places, lap = () => {}, on
   const levelOf = (scale) => Math.log2(finest / scale);
   const levelDir = (scale) => {
     const d = path.join(out, String(levelOf(scale)));
-    if (!rows && !part) fs.rmSync(d, { recursive: true, force: true }); // a shared-out scale is cleared by whoever shares it out
+    if (!rows && !part && !keep) fs.rmSync(d, { recursive: true, force: true }); // a shared-out scale is cleared by whoever shares it out
     fs.mkdirSync(d, { recursive: true });
     return d;
   };
@@ -213,7 +214,7 @@ export function buildPyramid({ base, fine, look, out, places, lap = () => {}, on
       if (cols === 1 && rows === 1) break;
     }
   }
-  const tag = rows ? `.r${rows[0]}` : part ? `.p${part[0]}` : '';
+  const tag = noteTag ? `.${noteTag}` : rows ? `.r${rows[0]}` : part ? `.p${part[0]}` : '';
   for (const F of Object.keys(info)) fs.writeFileSync(path.join(out, `scale-${F}${tag}.json`), JSON.stringify({ level: info[F], below: Number(F) === 1 && !rows ? levels : undefined }));
   lap(`${look.name}: ${count} tiles, ${(bytes / 1e6).toFixed(0)} MB`);
 }

@@ -915,7 +915,7 @@ export function createViewer(canvas, manifest, base) {
       gl.uniform2f(progFinal.u.uPx, 1 / W, 1 / H);
       const near = Math.min(1, Math.max(0, (Math.log2(viewer.zoom) + 0.5) / 3)); // 0 below 0.7x, 1 from 5.6x
       gl.uniform1f(progFinal.u.uBlur, 2.4 * viewer.dpr * viewer.tilt * (1 - 0.85 * near));
-      gl.uniform1f(progFinal.u.uBloom, 0.8 * viewer.bloom * (1 - 0.45 * near) * (1 - 0.7 * night)); // and the glow with it
+      gl.uniform1f(progFinal.u.uBloom, 0.8 * viewer.bloom * (P.bloom ?? 1) * (1 - 0.45 * near) * (1 - 0.7 * night)); // and the glow with it
       gl.uniform1f(progFinal.u.uContrast, viewer.contrast);
       gl.uniform1f(progFinal.u.uPoster, viewer.pixel > 1 ? viewer.poster : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

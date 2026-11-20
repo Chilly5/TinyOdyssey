@@ -44,7 +44,8 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
   function render(gx0, gz0, gx1, gz1, F, look, opts = {}) {
     const clip = opts.yMax === undefined ? null : opts.yMax - OY * F;
     const lay = base.renderRegion(gx0, gz0, gx1, gz1, { layout: true }).lay;
-    const { ex0, ez0, ew, ed, H: bH, mat: bM, EL: bE, flag: bF, sh } = lay;
+    const { ex0, ez0, ew, ed, H: bH, mat: bM, EL: bE, flag: bF } = lay;
+    const sh = lay.sh0 || lay.sh; // the landmarks' own shadows are laid on separately, sharp (lmShade below)
     const bi = (x) => clamp(Math.round(x) - ex0, 0, ew - 1), bj = (z) => clamp(Math.round(z) - ez0, 0, ed - 1);
 
     // --- The fine grid: the region and a margin, so that slopes and neighbours can be read at its edge ---
@@ -300,6 +301,17 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
     const img = new Uint32Array(iw * ih);
     const zb = new Uint16Array(iw * ih);
     const row = (fz, y) => Math.round(KZ * fz - KY * y) - iy0;
+    // The landmarks that can throw a shadow into this piece, each answering for a point in fine voxels.
+    const marks = landmarksAt(F);
+    const casters = [];
+    for (const lm of marks) {
+      const f = lm.shadow ? lm.shadow(X0, Z0, X1, Z1) : null;
+      if (f) casters.push(f);
+    }
+    const lmShade = casters.length === 0 ? null : (fx, y, fz) => {
+      for (let n = 0; n < casters.length; n++) if (casters[n](fx, y, fz)) return true;
+      return false;
+    };
     const { TOP, WALL, SEA, RIVER, rock, stone } = look;
     const TOPALT = look.TOPALT || TOP;
     const rimW = look.rim ? Math.max(1, Math.round(F * look.rim)) : 1;
@@ -326,7 +338,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
             const dn = dep * (1 + w1 * 0.55 + di * 2) + w2 * 60;
             c = dn < 330 ? SEA.mid : dn < 1350 ? SEA.sea : dn < 2700 ? SEA.deep : SEA.abyss;
           }
-          if (shaded(bx, bz, 3)) c = look.shade(c);
+          if (shaded(bx, bz, 3) || (lmShade !== null && lmShade(fx, 0, fz))) c = look.shade(c);
           const p = row(fz, 0) * iw + px;
           img[p] = c;
           zb[p] = zr;
@@ -336,7 +348,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
         const hs = fH[k + fw], hw = fH[k - 1], hn = fH[k - fw];
         const yTop = row(fz, h);
         let level = fL[k];
-        const shade = shaded(bx, bz, (h / F) * 8 + 3);
+        const shade = shaded(bx, bz, (h / F) * 8 + 3) || (lmShade !== null && lmShade(fx, h, fz));
         if (b === B.RIVER) c = RIVER[shade ? 0 : level];
         else {
           // The lit rim of a ledge, and the dim strip at the foot of the one behind.
@@ -352,7 +364,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
           const yB = Math.round(KZ * (fz + 1) - KY * hs) - iy0;
           const mason = b === B.MASON;
           const wr = b === B.RIVER ? null : mason ? stone : h - hs >= 7 * F ? rock : WALL[b]; // tall drops are bare cliff
-          const wallShade = shaded(bx, bz + 1 / F, ((hs + h) / F) * 4);
+          const wallShade = shaded(bx, bz + 1 / F, ((hs + h) / F) * 4) || (lmShade !== null && lmShade(fx, (hs + h) >> 1, fz + 1));
           const wl0 = 2 + fT[k] - (wallShade ? 1 : 0);
           const isRock = wr === rock;
           const bed = isRock ? Math.round((5 + ((hash2(Math.round(bx) >> 4, Math.round(bz) >> 5, 143) * 3) | 0)) * Math.max(1, F * 0.55)) : 0; // rows between bedding lines
@@ -403,7 +415,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
         if (zb[p] > zr) continue;
         let level = lvs[v] + lean;
         level = level < 0 ? 0 : level > 4 ? 4 : level;
-        if (shaded(toB(fx), toB(fz), (y / F) * 8 + 6)) level = level > 2 ? level - 2 : 0;
+        if (shaded(toB(fx), toB(fz), (y / F) * 8 + 6) || (lmShade !== null && lmShade(fx, y, fz))) level = level > 2 ? level - 2 : 0;
         const c = ramps[m.part[v]][level];
         img[p] = c;
         zb[p] = zr;
@@ -416,7 +428,7 @@ export function createFine({ base, fields, rivers = [], landmarksAt = () => [] }
 
     // --- Landmarks ---
     const ctx = { img, zb, iw, ih, X0, Z0, X1, Z1, iy0, F, shaded, toB, look };
-    for (const lm of landmarksAt(F)) lm.draw(ctx);
+    for (const lm of marks) lm.draw(ctx);
 
     if (look.finish) look.finish({ img, zb, iw, ih, F });
     return { img, zb, iw, ih, ix0: X0, iy0: iy0 + OY * F, gz0: Z0 };

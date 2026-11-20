@@ -8,7 +8,7 @@ import { Geo, rgb, shade } from './kit.js';
 
 const S = 1; // models are built, and baked, in their own units
 import {
-  C, temple, tholos, wallRing, house, person, beast, disc, crag, cave, cloud,
+  C, temple, tholos, wallRing, house, person, beast, disc, crag, cave, cloud, column, archFace,
   sheep, pig, cow, lion,
 } from './models.js';
 import { MINOR } from './minor.js';
@@ -49,12 +49,19 @@ function necks(L, o) {
   for (let i = 0; i < o.n; i++) {
     const g = new Geo();
     const segs = o.segs || 4;
-    for (let k = 0; k < segs; k++) g.box(0, k * o.seg, 0, o.thick, o.seg + 0.02, o.thick, k % 2 ? o.col : o.col2);
+    const th = o.thick;
+    for (let k = 0; k < segs; k++) { // round and ringed, thinner towards the head, with a ridge of spines behind
+      g.limb([0, k * o.seg, 0], [0, (k + 1) * o.seg, 0], th * (0.6 - k * 0.025), th * (0.575 - k * 0.025), k % 2 ? o.col : o.col2, { sides: 8 });
+      g.lathe(0, (k + 0.3) * o.seg, -th * 0.5, [[th * 0.16, 0], [0, th * 0.55]], 4, o.col2);
+    }
     const hy = segs * o.seg;
-    g.box(0, hy, 0.05, o.thick * 1.7, o.thick * 1.15, o.thick * 2.1, o.col);
-    g.box(0, hy - o.thick * 0.2, 0.09, o.thick * 1.3, o.thick * 0.3, o.thick * 1.9, o.jaw || C.crimson);
-    g.box(-o.thick * 0.5, hy + o.thick * 0.6, o.thick * 0.9, o.thick * 0.35, o.thick * 0.35, 0.03, o.eye || C.flame);
-    g.box(o.thick * 0.5, hy + o.thick * 0.6, o.thick * 0.9, o.thick * 0.35, o.thick * 0.35, 0.03, o.eye || C.flame);
+    g.ball(0, hy + th * 0.6, th * 0.5, th * 0.85, th * 0.62, th * 1.15, o.col, { seg: 10 }); // the skull
+    g.ball(0, hy + th * 0.42, th * 1.3, th * 0.56, th * 0.4, th * 0.6, o.col, { seg: 8 }); // the snout
+    g.ball(0, hy + th * 0.12, th * 0.75, th * 0.66, th * 0.2, th * 1.0, o.jaw || C.crimson, { seg: 8 }); // the open jaw
+    for (const sx of [-1, 1]) {
+      g.ball(sx * th * 0.52, hy + th * 0.88, th * 0.9, th * 0.2, th * 0.2, th * 0.14, o.eye || C.flame, { seg: 6 });
+      g.lathe(sx * th * 0.36, hy + th * 0.12, th * 1.45, [[th * 0.09, 0], [0, th * 0.34]], 4, C.white); // a fang
+    }
     const m = L.fx.mesh(L.group, g, { shadow: true });
     const f = o.n === 1 ? 0 : i / (o.n - 1) - 0.5;
     m.position.set(o.x + f * (o.fanX ?? 0.4), o.y, o.z + Math.abs(f) * (o.fanZ ?? -0.1));
@@ -413,8 +420,18 @@ export const MODELS = {
 
   hydra(g, s, L) {
     g.cyl(0, 0, 0, 0.62, 0.55, 0.04, 8, rgb('#3d6b4a'), { top: rgb('#35604a') });
-    for (let i = 0; i < 6; i++) g.box(Math.cos(i * 1.1) * 0.5, 0, Math.sin(i * 1.1) * 0.42, 0.03, 0.22, 0.03, C.leaf);
-    g.blob(0, 0.16, 0, 0.3, 0.2, 0.26, rgb('#3fae6a'), { dark: rgb('#2a7a4c') });
+    for (let i = 0; i < 14; i++) { // reeds round the swamp, in clumps
+      const a = i * 1.1, rx = Math.cos(a) * (0.44 + (i % 3) * 0.05), rz = Math.sin(a) * (0.38 + (i % 2) * 0.06);
+      g.limb([rx, 0.02, rz], [rx + Math.cos(a * 3) * 0.03, 0.2 + (i % 4) * 0.04, rz], 0.012, 0.006, i % 2 ? C.leaf : C.green, { sides: 5 });
+      if (i % 3 === 0) g.ball(rx + Math.cos(a * 3) * 0.03, 0.22 + (i % 4) * 0.04, rz, 0.014, 0.04, 0.014, C.woodD, { seg: 6 });
+    }
+    // The Hydra's body: coils heaped in the mud, scaled along the back.
+    const hydra = rgb('#3fae6a'), hydraD = rgb('#2a7a4c');
+    g.ball(0, 0.13, 0, 0.32, 0.17, 0.28, hydra, { seg: 14, dark: hydraD });
+    g.ball(-0.2, 0.1, 0.14, 0.2, 0.11, 0.16, hydraD, { seg: 10 });
+    g.ball(0.22, 0.09, 0.12, 0.18, 0.1, 0.15, hydra, { seg: 10, dark: hydraD });
+    g.limb([-0.3, 0.08, 0.1], [-0.52, 0.03, 0.26], 0.07, 0.02, hydraD, { sides: 8 }); // its tail, trailing in the water
+    for (let i = 0; i < 6; i++) g.lathe(-0.2 + i * 0.08, 0.27 - Math.abs(i - 2.5) * 0.02, -0.02, [[0.03, 0], [0, 0.07]], 5, rgb('#d9c94f'), { sz: 0.5 });
     necks(L, { n: 5, x: 0, y: 0.22, z: 0.02, seg: 0.15, thick: 0.1, col: rgb('#3fae6a'), col2: rgb('#2e8b57') });
   },
 
@@ -467,7 +484,16 @@ export const MODELS = {
     house(g, 0, 0.16, 0.52, 0.8, 0.1);
     g.at(-0.8, 0, 1.62, -0.45, 1, (q) => { // the horse, left on the plain
       q.box(0, 0.1, 0, 0.92, 0.06, 0.44, C.woodD);
-      for (const sx of [-0.3, 0.3]) for (const sz of [-0.2, 0.2]) q.box(sx, 0, sz, 0.18, 0.18, 0.06, C.dark);
+      for (const sx of [-0.3, 0.3]) for (const sz of [-0.2, 0.2]) { // its wheels, spoked
+        for (let i = 0; i < 12; i++) {
+          const a0 = (i / 12) * Math.PI * 2, a1 = ((i + 1) / 12) * Math.PI * 2;
+          const p = (a, r, dz) => [sx + Math.cos(a) * r, 0.09 + Math.sin(a) * r, sz + dz];
+          q.triOut(p(0, 0, 0.035), p(a0, 0.09, 0.035), p(a1, 0.09, 0.035), i % 2 ? C.woodD : C.wood, [sx, 0.09, sz - 1]);
+          q.triOut(p(0, 0, -0.035), p(a0, 0.09, -0.035), p(a1, 0.09, -0.035), C.woodD, [sx, 0.09, sz + 1]);
+          q.triOut(p(a0, 0.09, 0.035), p(a1, 0.09, 0.035), p(a1, 0.09, -0.035), C.dark, [sx, 0.09, sz]);
+          q.triOut(p(a0, 0.09, 0.035), p(a1, 0.09, -0.035), p(a0, 0.09, -0.035), C.dark, [sx, 0.09, sz]);
+        }
+      }
       beast(q, 0, 0.16, 0, 0.8, { body: C.wood, legs: C.woodD, neck: 0.34, headUp: 0.75, snout: C.woodD, mane: C.woodD, tail: C.woodD, legH: 0.44, bodyH: 0.36, bodyW: 0.34 });
     });
     L.fx.puffs(L.group, { x: 0.2, y: 0.7, z: -0.1, color: '#5f5a66', n: 6, life: 6, rise: 2.6, size: 0.34, drift: [0.7, 0.1] });
@@ -746,6 +772,15 @@ export const MODELS = {
     g.box(0, 0, -0.2, 0.8, 0.36, 0.6, C.stone, { top: C.stoneD });
     g.gable(0, 0.36, -0.2, 0.9, 0.3, 0.7, C.purple, false, C.stone);
     g.box(0.3, 0.36, -0.4, 0.14, 0.42, 0.14, C.stoneD);
+    // A porch along the front: steps, four columns, a beam, and a shuttered window either side of the door.
+    g.box(0, 0, 0.21, 0.9, 0.03, 0.24, C.stoneD);
+    for (let i = 0; i < 4; i++) column(g, -0.36 + i * 0.24, 0.03, 0.27, 0.03, 0.31, C.cream, { sides: 10 });
+    g.box(0, 0.34, 0.2, 0.9, 0.04, 0.2, C.stoneD, { top: C.stone });
+    for (const wx of [-0.27, 0.27]) {
+      g.box(wx, 0.14, 0.102, 0.09, 0.11, 0.006, C.night);
+      g.box(wx, 0.125, 0.106, 0.11, 0.014, 0.012, C.stoneD);
+    }
+    g.box(0, 0.03, 0.104, 0.24, 0.3, 0.008, C.stoneD);
     L.fx.mesh(L.group, new Geo().box(0, 0, 0.11, 0.2, 0.26, 0.02, rgb('#ff9cf0')), { glow: true }); // a lit doorway
     L.fx.puffs(L.group, { x: 0.3, y: 0.85, z: -0.4, color: '#b06be0', n: 5, life: 4.5, rise: 1.8, size: 0.22, drift: [0.4, 0] });
     person(g, -0.38, 0, 0.42, 0.42, { tunic: C.purple, hair: C.dark, rightUp: true });
@@ -764,10 +799,13 @@ export const MODELS = {
 
   underworld(g, s, L) {
     g.cyl(0, 0, 0, 0.6, 0.55, 0.03, 9, rgb('#1c1530'), { top: rgb('#120d22') });
-    const dead = (x, z, h) => {
-      g.box(x, 0, z, 0.06, h, 0.06, C.dark);
-      g.box(x + 0.08, h * 0.6, z, 0.16, 0.04, 0.04, C.dark);
-      g.box(x - 0.07, h * 0.8, z, 0.14, 0.04, 0.04, C.dark);
+    const dead = (x, z, h) => { // a dead tree: a leaning trunk and a few bare boughs
+      g.limb([x, 0, z], [x + 0.02, h * 0.55, z], 0.042, 0.03, C.dark, { sides: 6 });
+      g.limb([x + 0.02, h * 0.55, z], [x - 0.03, h, z + 0.02], 0.03, 0.01, C.dark, { sides: 6 });
+      g.limb([x + 0.02, h * 0.5, z], [x + 0.2, h * 0.78, z + 0.03], 0.022, 0.008, C.dark, { sides: 5 });
+      g.limb([x + 0.12, h * 0.66, z + 0.02], [x + 0.2, h * 0.94, z - 0.02], 0.014, 0.005, C.dark, { sides: 5 });
+      g.limb([x, h * 0.66, z], [x - 0.17, h * 0.9, z - 0.02], 0.02, 0.008, C.dark, { sides: 5 });
+      g.limb([x - 0.1, h * 0.8, z - 0.01], [x - 0.13, h * 1.04, z + 0.03], 0.012, 0.004, C.dark, { sides: 5 });
     };
     dead(-0.8, -0.3, 0.6);
     dead(0.8, -0.4, 0.7);
@@ -803,7 +841,12 @@ export const MODELS = {
     // Scylla's cliff on the mainland side, Charybdis in the channel below it.
     const sx = 1.0, sz = -0.25;
     crag(g, sx, -0.3, sz, 0.6, 2.0, 41, rgb('#857e9b'), rgb('#635c7c'));
-    g.box(sx - 0.25, 0.5, sz + 0.34, 0.34, 0.34, 0.2, C.night);
+    g.box(sx - 0.25, 0.5, sz + 0.3, 0.3, 0.3, 0.2, C.night); // her cave, half way up
+    archFace(g, sx - 0.25, 0.48, sz + 0.405, 0.2, 0.4, C.night);
+    g.rock(sx - 0.25, 0.9, sz + 0.34, 0.28, 0.1, 0.14, 411, rgb('#857e9b'), rgb('#635c7c'));
+    g.rock(sx - 0.47, 0.6, sz + 0.36, 0.08, 0.2, 0.1, 412, rgb('#857e9b'), rgb('#635c7c'));
+    g.rock(sx - 0.03, 0.6, sz + 0.36, 0.08, 0.2, 0.1, 413, rgb('#7b7493'), rgb('#635c7c'));
+    g.rock(sx - 0.25, 0.44, sz + 0.42, 0.26, 0.06, 0.1, 414, rgb('#857e9b'), rgb('#635c7c'));
     necks(L, {
       n: 6, x: sx - 0.25, y: 0.62, z: sz + 0.36, segs: 5, seg: 0.16, thick: 0.1, fanX: 0.1, fanZ: 0.3,
       col: rgb('#7fa08a'), col2: rgb('#5f8470'), jaw: C.white, eye: C.red, leanZ: 0.75, splay: 0.9, leanX: 0.35, sway: 0.2,

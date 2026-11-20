@@ -59,43 +59,49 @@ const pixel = {
   finish: outline,
 };
 
-// --- The terraced look: every ramp redrawn paler and flatter, the same for every colour in the world ---
-const soften = cache((ramp) => {
+// --- The terraced look ---
+// Two ways of taking a colour (level 3 of its ramp) to five flat tones.
+const tones = (steps) => cache((ramp) => {
   const [r, g, b] = un(ramp[3]);
-  const mix = (t, tr, tg, tb, k = 1) => pack(Math.round(Math.min(255, (r + (tr - r) * t) * k)), Math.round(Math.min(255, (g + (tg - g) * t) * k)), Math.round(Math.min(255, (b + (tb - b) * t) * k)));
-  // 0 deep shade, 1 a face turned from the light, 2 a face, 3 the top, 4 the lip in the sun.
-  return Uint32Array.of(mix(0.4, 70, 80, 140, 0.8), mix(0.26, 90, 100, 150, 0.9), mix(0.12, 120, 125, 160), mix(0.1, 255, 252, 235), mix(0.42, 255, 253, 240));
+  return Uint32Array.from(steps, ([t, tr, tg, tb, k = 1]) => pack(Math.round(Math.min(255, (r + (tr - r) * t) * k)), Math.round(Math.min(255, (g + (tg - g) * t) * k)), Math.round(Math.min(255, (b + (tb - b) * t) * k))));
 });
+// The ground, sheets of card: 3 the top of a sheet, 4 the lip of its ledge in the sun, 2 down to 0 its cut
+// edge, deeper as it turns from the light.
+const sheet = tones([[0.5, 56, 62, 126, 0.82], [0.34, 76, 84, 140, 0.9], [0.18, 100, 104, 150, 0.96], [0.02, 255, 252, 235], [0.3, 255, 253, 238]]);
+// What stands on it, lit by which way each face looks: 4 in full sun (a top, a west face) and no paler
+// than its own colour, 2 a face out of the sun, 0 turned right away or in something's shadow.
+const solid = tones([[0.6, 44, 46, 112, 0.74], [0.42, 62, 66, 130, 0.84], [0.24, 90, 94, 146, 0.93], [0.1, 118, 120, 158], [0.07, 255, 250, 226]]);
 const softSea = {};
 for (const [k, c] of Object.entries(SEA)) {
   const [r, g, b, a] = un(c);
-  softSea[k] = pack(Math.round(r + (255 - r) * 0.1), Math.round(g + (255 - g) * 0.1), Math.round(b + (250 - b) * 0.06), a);
+  softSea[k] = pack(Math.round(r + (255 - r) * 0.04), Math.round(g + (255 - g) * 0.04), Math.round(b + (250 - b) * 0.02), a);
 }
 const lists = new Map();
 // Every other terrace a shade paler, so the layers can be counted like sheets of card.
 const paler = cache((ramp) => Uint32Array.from(ramp, (c) => {
   const [r, g, b] = un(c);
-  return pack(Math.round(r + (255 - r) * 0.13), Math.round(g + (255 - g) * 0.13), Math.round(b + (250 - b) * 0.1));
+  return pack(Math.round(r + (255 - r) * 0.08), Math.round(g + (255 - g) * 0.08), Math.round(b + (250 - b) * 0.06));
 }));
 const voxel = {
   name: 'voxel',
-  TOP: TOP.map((r) => r && soften(r)),
-  TOPALT: TOP.map((r) => r && paler(soften(r))),
+  TOP: TOP.map((r) => r && sheet(r)),
+  TOPALT: TOP.map((r) => r && paler(sheet(r))),
   // The edge of a sheet is the colour of the sheet, a tone deeper: not the brown earth of the pixel look.
-  WALL: TOP.map((r) => r && soften(r)),
+  WALL: TOP.map((r) => r && sheet(r)),
   SEA: softSea, RIVER,
-  rock: soften(R.rock), stone: soften(R.stone),
-  ramp: soften,
+  rock: sheet(R.rock), stone: solid(R.stone),
+  ramp: solid,
   ramps: (list) => {
     let out = lists.get(list);
-    if (!out) lists.set(list, out = list.map(soften));
+    if (!out) lists.set(list, out = list.map(solid));
     return out;
   },
-  shade: shadeOf(0.2),
+  shade: shadeOf(0.36),
   dither: false,
   texture: false,
   rim: 0.3,
   finish: null,
+  view: { bloom: 0.5 }, // for the viewer: pale flat colour glows more than it should
 };
 
-export const LOOKS = { pixel, voxel };
+export const LOOKS = { voxel, pixel }; // the first is the one a visitor sees first

@@ -75,6 +75,7 @@ if (sheet) {
   // The picture itself: every zoom level drawn natively, in each look, into WORLD/<look>/ (gen/pyramid.mjs).
   // The scales do not depend on one another, so they can be run side by side, one process each, and
   // `--pyramid --styles` run afterwards to write what was made into the manifest.
+  //   node gen/build.mjs --pyramid --touch athens,troy [--look voxel]   draws just those places again, in place.
   const { createFine } = await import('./fine.mjs');
   const { LOOKS } = await import('./looks.mjs');
   const { buildPyramid, pyramidOf } = await import('./pyramid.mjs');
@@ -91,7 +92,10 @@ if (sheet) {
   };
   const fine = createFine({ base: plain, fields, rivers: fields.rivers, landmarksAt });
   // Where to go deeper: round every place, a little wider than its own ground and as tall as what stands on it.
-  const wanted = arg('places') ? arg('places').split(',') : null;
+  // --touch a,b: those places have changed (a model was reworked). Draw them again at every scale, into
+  // the pyramid as it stands: their own tiles at the finer scales, and the rows they lie in at the others.
+  const touch = arg('touch') ? arg('touch').split(',') : null;
+  const wanted = touch || (arg('places') ? arg('places').split(',') : null);
   const places = [];
   for (const st of sites) {
     if (st.x == null || (wanted && !wanted.includes(st.id))) continue;
@@ -103,7 +107,23 @@ if (sheet) {
     places.push({ x0: x - hw, x1: x + hw, y0: y - Math.max(lm ? lm.height : 0, hw * 0.62) - 12, y1: y + Math.max(lm ? lm.below : 0, hw * 0.62) + 14 });
   }
   const mf = path.join(out, 'manifest.json');
-  if (!process.argv.includes('--styles')) {
+  if (touch) {
+    const { FULL, SPARSE } = await import('./pyramid.mjs');
+    for (const name of arg('look', 'pixel,voxel').split(',')) {
+      const common = { base: plain, fine, look: LOOKS[name], out: path.join(out, name), places, lap };
+      buildPyramid({ ...common, only: SPARSE, keep: true, tag: `t-${touch[0]}` });
+      for (const F of FULL) {
+        const spans = places.map((p) => [Math.max(0, Math.floor((p.y0 * F) / 512)), Math.floor((p.y1 * F) / 512) + 1]).sort((a, b) => a[0] - b[0]);
+        const runs = [];
+        for (const s of spans) {
+          const last = runs[runs.length - 1];
+          if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+          else runs.push([...s]);
+        }
+        for (const rows of runs) buildPyramid({ ...common, only: [F], rows });
+      }
+    }
+  } else if (!process.argv.includes('--styles')) {
     for (const name of arg('look', 'pixel,voxel').split(',')) {
       buildPyramid({ base: plain, fine, look: LOOKS[name], out: path.join(out, name), places, lap, only: arg('scales') ? arg('scales').split(',').map(Number) : null,
         rows: arg('rows') ? arg('rows').split(',').map(Number) : null, part: arg('part') ? arg('part').split('/').map(Number) : null });
@@ -111,10 +131,10 @@ if (sheet) {
   }
   // --styles (or a run of every scale): tell the world which pictures it has. The drawn ones first; the
   // painted one, if tiles.py has made it, stays on offer after them.
-  if (fs.existsSync(mf) && (process.argv.includes('--styles') || (!arg('scales') && !wanted))) {
+  if (fs.existsSync(mf) && (process.argv.includes('--styles') || touch || (!arg('scales') && !wanted))) {
     const man = JSON.parse(fs.readFileSync(mf, 'utf8'));
     const styles = {};
-    for (const name of Object.keys(LOOKS)) if (fs.existsSync(path.join(out, name, 'scale-1.json'))) styles[name] = { dir: name, ...pyramidOf(path.join(out, name)) };
+    for (const name of Object.keys(LOOKS)) if (fs.existsSync(path.join(out, name, 'scale-1.json'))) styles[name] = { dir: name, ...pyramidOf(path.join(out, name)), ...(LOOKS[name].view || {}) };
     if (man.paint) styles.painted = { dir: 'tiles', ...man.paint };
     man.styles = styles;
     man.version = Date.now().toString(36);
