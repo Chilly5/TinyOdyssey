@@ -28,6 +28,12 @@ npm run deploy       # copies those into dist/ and pushes them as the gh-pages b
 
 The branch is replaced on every deploy rather than added to, so the repository does not fill up with old pictures. Any other static host (Netlify, Cloudflare Pages) can be given the same `dist/` folder: `node tools/deploy.mjs --dry` makes it without pushing.
 
+**A domain of its own.** Three steps, in this order, so the address already shared never stops working:
+
+1. At the domain's DNS, point it at GitHub Pages: four `A` records for the bare domain (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`), four `AAAA` records (`2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`), and a `CNAME` for `www` to `<owner>.github.io.`
+2. Put the domain in a file called `CNAME` at the top of this repository (one line) and `npm run deploy`. The file goes up with the site each time; link previews use the domain from then on, and the `github.io` address redirects to it.
+3. When GitHub has issued the certificate (minutes to an hour), turn on *Enforce HTTPS* in the repository's Pages settings.
+
 Links can point at a place: `…/#olympus` opens Mount Olympus, `…/#odyssey` starts the voyage. The ids are in `src/sites.js` and `src/minor.js`. `?time=night` or `?time=day` holds the time of day still.
 
 ## How the picture is made

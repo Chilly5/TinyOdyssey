@@ -9,6 +9,11 @@
 //   node tools/deploy.mjs [--world world.next] [--remote origin] [--dry]
 //
 // --world publishes another build of the world (it is still served as world/). --dry stops before the push.
+//
+// A domain of its own: put it in a file called CNAME at the top of the repository (one line, such as
+// tinyodyssey.us). GitHub Pages reads that file from the published branch, so it goes up with every
+// deploy; without it the next deploy would take the domain off again. Point the domain at GitHub first
+// (README, "Share it"): once the file is published the github.io address redirects to the domain.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,14 +32,17 @@ if (!fs.existsSync(path.join(world, 'manifest.json'))) throw new Error(`${world}
 const remote = git(root, 'remote', 'get-url', arg('remote', 'origin'));
 // https://github.com/owner/name(.git) or git@github.com:owner/name(.git) -> https://owner.github.io/name/
 const m = remote.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
-const site = m ? `https://${m[1].toLowerCase()}.github.io/${m[2]}/` : null;
+const cname = path.join(root, 'CNAME');
+const domain = fs.existsSync(cname) ? fs.readFileSync(cname, 'utf8').trim() : '';
+if (domain && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(domain)) throw new Error(`CNAME should hold one domain name, not "${domain}"`);
+const site = domain ? `https://${domain}/` : m ? `https://${m[1].toLowerCase()}.github.io/${m[2]}/` : null;
 
 const dist = path.join(root, 'dist');
 // The folder is emptied but its .git is kept: that holds the site as it was last pushed, and with it git
 // sends only the files that have changed since (a few megabytes, not all seven hundred).
 fs.mkdirSync(dist, { recursive: true });
 for (const e of fs.readdirSync(dist)) if (e !== '.git') fs.rmSync(path.join(dist, e), { recursive: true, force: true });
-for (const f of ['index.html', 'preview.jpg', '.nojekyll']) if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(dist, f));
+for (const f of ['index.html', 'preview.jpg', '.nojekyll', 'CNAME']) if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(dist, f));
 fs.cpSync(path.join(root, 'src'), path.join(dist, 'src'), { recursive: true });
 fs.cpSync(world, path.join(dist, 'world'), { recursive: true });
 if (site) { // link previews want whole addresses
