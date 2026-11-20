@@ -3,8 +3,8 @@
 //
 // What is heard depends on how close the view is, in three bands that fade into each other:
 //   far    the whole map, seen from high up: the song at its fullest, and the wind
-//   mid    a region: the song further back; the wind drops, and where there is a coast the sea comes in
-//   close  down on the ground: waves on the shore, the murmur of a town and its market (two recordings,
+//   mid    a region: the song further back, and the wind dropping. No sea yet: that is a sound of the ground
+//   close  down on the ground: the sea and its waves on the shore, the murmur of a town and its market (two recordings,
 //          src/audio/market.mp3 and village.mp3), and in the country leaves, cicadas, small birds, a
 //          woodpecker, bees, sheep; at night crickets, frogs, an owl
 // Nothing here plays a tune: the song is the only music. Nothing sounds until the visitor asks for it
@@ -92,16 +92,17 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
       return p;
     };
 
-    // The wind, as it is heard from high up: a body of moving air that comes in gusts, and a thin
-    // whistle that rises and falls over it.
+    // The wind, as it is heard from high up: air moving in a narrow band, whose pitch climbs as it gusts,
+    // and a thin whistle over it. It must not be taken for surf, which is a wide, low noise that swells
+    // and falls: so there is nothing low under it, and a gust is a rise in pitch more than in loudness.
     const wind = gain();
-    const body = filter('bandpass', 420, 0.9), gust = gain(0.62);
-    loop(white, 0.7).connect(body).connect(gust).connect(wind);
-    lfo(0.07, 160, body.frequency);
-    lfo(0.19, 70, body.frequency);
-    lfo(0.13, 0.3, gust.gain);
-    lfo(0.031, 0.18, gust.gain);
-    const whistle = filter('bandpass', 1150, 7), thin = gain(0.2);
+    const body = filter('bandpass', 560, 1.7), gust = gain(0.7);
+    loop(white, 0.7).connect(filter('highpass', 240)).connect(body).connect(gust).connect(wind);
+    lfo(0.083, 190, body.frequency);
+    lfo(0.21, 80, body.frequency);
+    lfo(0.083, 0.14, gust.gain);
+    lfo(0.031, 0.1, gust.gain);
+    const whistle = filter('bandpass', 1150, 7), thin = gain(0.24);
     loop(white, 1.3).connect(whistle).connect(thin).connect(wind);
     lfo(0.05, 380, whistle.frequency);
     lfo(0.23, 0.16, thin.gain);
@@ -474,9 +475,10 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
         song.gain.gain.setTargetAtTime(m.song, t, 0.8);
         song.lp.frequency.setTargetAtTime(16000 - 11500 * close - 3000 * mid, t, 0.8);
       }
-      // High up there is only the wind. It dies away on the way down, and the sea takes its place.
+      // High up there is only the wind, and it dies away on the way down. The sea is a sound of the ground:
+      // nothing of it until the view is close, then the wash, the foam, the waves and the gulls together.
       m.wind = 0.3 * far + 0.07 * mid;
-      m.sea = shore * (0.13 * mid + 0.24 * close);
+      m.sea = 0.24 * shore * close;
       // People: a town's talk from the streets, and on top of it the market when the view is among the stalls.
       m.town = 0.3 * s.town * (0.3 * mid + close) * awake;
       m.market = 0.34 * busy;
@@ -505,7 +507,7 @@ export function createSound({ music: musicUrl = null, town: townUrl = null, mark
       tick('bee', 0.22 * wild * day * close, () => bee(0.02));
       tick('owl', 0.12 * wild * s.night * close, () => owl(0.028));
       tick('frog', 0.5 * coast * s.night * close, () => frog(0.04));
-      tick('gull', 1.1 * coast * day * (0.25 * mid + 0.8 * close), () => gull(0.011));
+      tick('gull', 0.88 * coast * day * close, () => gull(0.011));
       tick('wave', 0.55 * coast * close, () => wave(0.07));
       tick('hammer', 0.3 * s.town * day * close, () => hammer(0.05));
       tick('bleat', 0.2 * wild * day * close, () => bleat(0.022));
