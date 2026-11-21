@@ -232,6 +232,8 @@ def human(m, t, o):
     walk = o.get("still", False) is False
     sw = math.sin(t * math.tau) * (30 if walk else 0) * o.get("stride", 1)
     bob = (abs(math.cos(t * math.tau)) * 0.5 if walk else 0) + o.get("lift", 0)
+    if o.get("bobgrid"):   # cut into cubes (units/stack.py): it rises by whole cubes, so nothing above the legs changes shape
+        bob = round(bob * o["bobgrid"]) / o["bobgrid"]
     skin, tunic = o.get("skin", "skin"), o.get("tunic", "white")
     legs = o.get("legs", skin)
     long_ = o.get("long", False)     # a robe to the ankles
@@ -271,13 +273,20 @@ def human(m, t, o):
             ang = 20 + math.sin(t * math.tau) * 6
         elif pose == "work":
             ang = 95 + math.sin(t * math.tau) * 55
+        elif pose == "march":   # in the ranks: the spear arm crooked, the shield arm across the body, neither swinging
+            ang = 28 if side == -1 else 38
         m.at(0, side * 3.3, 10.6, ry=-ang)
         sleeve = o.get("sleeve", skin)
         m.limb((0, 0, 0), (0, 0, -2.6), 0.88, 0.74, sleeve)
         m.limb((0, 0, -2.6), (0.3, 0, -4.8), 0.74, 0.62, sleeve)
         m.ball(0.3, 0, -5.3, 0.74, 0.74, 0.8, skin)
         if side == -1:   # the right hand holds things
-            if o.get("spear"):
+            if o.get("spear") == "up":   # carried upright whatever the arm does: its butt just clear of the ground
+                m.at(0.3, 0, -5.3, ry=ang)
+                m.limb((0.5, 0, -5.6), (0.5, 0, 14.4), 0.34, 0.3, o.get("shaft", "wood2"), 6)
+                m.prism(0.5, 0, 14.4, 0.66, 0.0, 2.9, "iron", 6)
+                m.pop()
+            elif o.get("spear"):
                 m.limb((0.65, 0, -7), (0.65, 0, 9), 0.34, 0.3, "wood2", 6)
                 m.prism(0.65, 0, 9, 0.62, 0.0, 2.7, "iron", 6)
             if o.get("staff"):
@@ -304,6 +313,12 @@ def human(m, t, o):
                 m.limb((0.2, 0, -3.5), (2.8, 0, -3.5), 0.22, 0.22, "gold", 6)
             if o.get("sword"):
                 m.box(0.3, -0.25, -5.4, 6.5, 0.25, -4.6, "iron")
+        elif o.get("shield") and o.get("shieldturn"):   # the shield brought round to cover the front: upright, turned about the upright
+            m.at(0, 0.9, -3.4, ry=ang).at(0, 0, 0, rz=-o["shieldturn"])
+            m.prism(0, 0, 0, 3.5, 3.2, 0.8, o["shield"], 14, "Y")
+            m.prism(0, 0, 0, 3.5, 3.5, 0.3, o.get("shieldrim", o["shield"]), 14, "Y")
+            m.prism(0, 0.7, 0, 1.3, 0.9, 0.6, o.get("boss", "gold"), 10, "Y")
+            m.pop().pop()
         elif o.get("shield"):
             m.prism(0, 0.9, -3.4, 3.4, 3.1, 0.8, o["shield"], 14, "Y")
             m.prism(0, 1.6, -3.4, 1.2, 0.8, 0.6, o.get("boss", "gold"), 10, "Y")

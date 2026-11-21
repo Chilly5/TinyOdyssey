@@ -1,6 +1,6 @@
 // Sprite stacks (units/stack.py) put into a world: their sheets of slices copied in, and what the
 // manifest says about them. A stack is a model kept as flat slices, which the viewer piles up and turns
-// (src/viewer.js, draw.stack), so that it can face any way; Odysseus's ship is one.
+// (src/viewer.js, draw.stack and draw.pose), so that it can face any way: the ships are, and the hoplites.
 //
 //   node gen/stacks.mjs [--out world]     into a world that is already built, leaving the rest of it alone
 //
@@ -11,9 +11,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-// Returns { name: { frames, sets: [{ r, n, reach, half, file, v, w, h, notes, frames, rects }] } }, or null if
-// none have been made. A set is one size of the model, with a sheet of its own; v changes whenever the sheet
-// does, so that a browser never pairs an old sheet with new slices.
+// Returns { name: { kind, frames, sets: [{ r, n, reach, half, file, v, w, h, notes, frames, rects }] } }, or null
+// if none have been made. kind is what it is (ship, human), which decides how the map keeps its pictures. A set
+// is one size of the model, with a sheet of its own; v changes whenever the sheet does, so that a browser never
+// pairs an old sheet with new slices.
 export function addStacks(out, unitDir) {
   const file = path.join(unitDir, 'stacks.json');
   if (!fs.existsSync(file)) return null;

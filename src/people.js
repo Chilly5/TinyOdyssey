@@ -225,7 +225,13 @@ export function createPeople(nameOf, isTown = () => true) {
     // What they are doing, which depends on where their path lies and who they are with.
     let doing;
     const to = place(c.to), from = place(c.from), he = female ? 'she' : 'he', his = female ? 'her' : 'his';
-    if (c.role === 'spouse' && lead) doing = `Walking to ${to} with ${his} husband ${lead.first}, and setting the pace.`;
+    if (c.where === 'company') {
+      // One of a company in close order, drilling on the road before the fleet gathers (life.js).
+      const nth = ['front', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'][c.rank] || 'middle';
+      doing = c.rank === 0 ? `Front rank of ${c.n}, drilling on the road between ${from} and ${to}. At each end they turn about, and ${he} becomes the rear rank.`
+        : c.rank === c.ranks - 1 ? `Rear rank of ${c.n}, drilling on the road between ${from} and ${to}, and eating dust until the next about-turn.`
+          : `${cap(nth)} rank of ${c.ranks}, drilling on the road between ${from} and ${to}. ${cap(he)} can see one helmet and has been looking at it all morning.`;
+    } else if (c.role === 'spouse' && lead) doing = `Walking to ${to} with ${his} husband ${lead.first}, and setting the pace.`;
     else if (c.role === 'file' && lead) doing = c.where === 'wall' ? `On watch, a step behind ${lead.first}, walking the wall of ${town}.` : `Marching to ${to} behind ${lead.first}, thinking about supper.`;
     else if (c.role === 'plough') doing = `Ploughing behind the ox outside ${town}, and talking to it.`;
     else if (c.role === 'keeper') doing = `Minding ${c.n || 'some'} animals on the hillside and trying to keep count.`;
@@ -250,7 +256,7 @@ export function createPeople(nameOf, isTown = () => true) {
     else if (child) doing = `Out in ${town || 'the street'}, ${pick(['running an errand the long way round', 'chasing a hoop', 'late for a lesson', 'following the soldiers at a safe distance', 'carrying a message and trying to remember it'])}.`;
     else if (aged) doing = `Out in ${town || 'the street'}, ${pick(['taking the air, slowly', 'on the way to the bench by the fountain', 'going to see what the mason is doing wrong', 'looking for someone to tell about the old days'])}.`;
     else doing = `Out in ${town || 'the street'} ${pick(ERRANDS)}.`;
-    const night = c.where === 'wall' ? `On the night watch, walking the wall of ${town} with a torch.` : c.where === 'sea' || c.where === 'boat' ? 'Night fishing, with a lamp in the bow to bring the fish up.' : 'Out late, and walking a little faster for it.';
+    const night = c.where === 'company' ? `A night march with the company, between ${from} and ${to}, keeping step by the sound of it.` : c.where === 'wall' ? `On the night watch, walking the wall of ${town} with a torch.` : c.where === 'sea' || c.where === 'boat' ? 'Night fishing, with a lamp in the bow to bring the fish up.' : 'Out late, and walking a little faster for it.';
     const dusk = `Heading home before the lamps are lit. Earlier: ${doing[0].toLowerCase()}${doing.slice(1)}`;
     return (m.who = {
       name: first, first, goods, title, life: life.join(' '),

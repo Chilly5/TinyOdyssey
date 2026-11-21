@@ -47,6 +47,16 @@ async function boot() {
   const actors = createActors(viewer, M, calm, BASE);
   const voyage = actors.voyage;
 
+  // What is kept as a sprite stack (units/stack.py): slices the viewer piles up and turns, so it faces any way.
+  // The ships are, each with a picture of its own; and of the people the hoplites, who share theirs.
+  // ?stacks=off shows the sprites of eight or sixteen headings that they replaced, to compare.
+  const stacked = new URLSearchParams(location.search).get('stacks') === 'off' ? {} : M.stacks || {};
+  const figures = {};
+  for (const [name, st] of Object.entries(stacked)) {
+    if (st.kind === 'human') figures[name] = viewer.addStack(st);
+    else actors.setStack(name, viewer.addStack(st));
+  }
+
   // The units' sheets and the paths everyone walks arrive after the map is up.
   if (M.units) {
     const first = 1 + (M.animPages || []).length;
@@ -57,21 +67,17 @@ async function boot() {
     if (M.life) {
       fetch(`${BASE}${M.life}?v=${M.version}`).then((r) => (r.ok ? r.json() : null)).then((data) => {
         if (!data) return;
-        const life = createLife(viewer, M, data, calm);
+        const life = createLife(viewer, M, data, calm, figures);
         actors.setLife(life);
         people = life;
         lightUp(data.lights || []);
         for (const l of life.named) roaming[l.id] = labels.add(l);
         labels.sort();
         labels.measure();
+        fromHash(); // a link may have been to one of them
       }).catch(() => {});
     }
   }
-
-  // What is kept as a sprite stack (units/stack.py): slices the viewer piles up and turns, so it faces any way.
-  // ?stacks=off shows the sixteen-heading sprites they replaced, to compare.
-  const stacked = new URLSearchParams(location.search).get('stacks') === 'off' ? {} : M.stacks || {};
-  for (const [name, st] of Object.entries(stacked)) actors.setStack(name, viewer.addStack(st));
 
   const siteById = {};
   for (const s of SITES) siteById[s.id] = s;
@@ -637,6 +643,10 @@ async function boot() {
     if (h === 'odyssey') {
       if (!document.body.classList.contains('voyaging')) startVoyage(0);
     } else if (siteById[h] && h !== selected) select(h, { via: 'link' });
+    else if (roaming[h] && !(following && following.id === h)) { // something that moves: go to it, close enough to see it
+      follow(h);
+      goal.zoom = clamp(Math.max(goal.zoom, 6), viewer.minZoom, viewer.maxZoom);
+    }
   }
   window.addEventListener('hashchange', fromHash);
 

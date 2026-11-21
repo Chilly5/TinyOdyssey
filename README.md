@@ -74,6 +74,7 @@ The viewer (`src/viewer.js`) is a small WebGL deep-zoom renderer with no depende
 
 - **The sea**, animated in a shader: surf running up the shore, swell lines that follow the coast, glints on open water.
 - **The little people** (`src/life.js`): travellers, carts and soldiers on the roads, townsfolk in the streets and markets, shepherds with their flocks, farmers in the fields, fishing boats, the watch round the walls, and creatures that keep to their own country (centaurs on Pelion, satyrs in Arcadia, Talos on his rounds of Crete). They follow paths laid out by `gen/life.mjs`.
+- **The phalanx**: fifty hoplites, five abreast, drilling on the road across the plain outside Ismarus (`company` in `src/life.js`; the page's address with `#phalanx` goes to them). They march as one body: at each end they halt, every man turns about where he stands, and the rear rank leads the way back. The hoplites are sprite stacks (below).
 - **Who they are** (`src/people.js`). Every one of them can be clicked. A name, a trade, a family, something of the town they come from and what they are doing at this moment (which changes at dusk) are made, the same every time, from the number each was given and where their path lies: a road between two towns, a market, a wall, a field. The map then keeps pace with them until it is dragged away.
 - **Ships** on sea routes found with A* (`gen/routes.mjs`): Odysseus, the Argo, Theseus, merchants and warships. All 26 are sprite stacks (below), so they come about smoothly instead of snapping between headings.
 - **Landmark animation.** The landmarks' moving parts: Sisyphus and his boulder, the Minotaur pacing the Labyrinth, the Clashing Rocks.
@@ -84,6 +85,10 @@ The people, animals and ships are small models built and rendered in **Blender**
 **Sprite stacks** (`units/stack.py`, `draw.stack` in `src/viewer.js`). A rendered unit can face only the sixteen ways it was rendered. The ships are kept differently: each of the six Blender models (Odysseus's galley, the Argo, Theseus's ship, a trireme and two merchantmen) is cut level by level into flat pictures of what is there at that height, seen from straight above (about a hundred of them at the finest of three sizes). Whenever a ship has turned a degree and a half, or moved an oar, the viewer draws its slices one over another into a small picture, each a little higher than the one below and all turned by the same angle, in hard pixels, two to the cube. That is the same squeeze the map's camera gives everything (0.6 for depth, 0.8 for height), so the pile sits in the picture like anything else. Beside each slice the sheet keeps which way every cube's surface faces, so the sun stays in the north-west as the ship comes about: a top is lit, a side takes one of three tones by where it now faces, and the whole throws a shadow on the water. The finished picture gets the units' dark outline and is then drawn like any sprite. The galleys pull a full stroke of the oars in eight frames, blades in the water on the way aft.
 
 Each ship has a finished picture of its own (two traders of one model seldom head the same way), given up when the ship has been out of sight for a while. Each size of a model has a sheet of its own, fetched when that size is first wanted, so a visitor who never comes close to a ship never loads its finest slices. Open the page with `?stacks=off` to see the rendered sprites they replaced, which are still what is shown until a ship's slices arrive.
+
+**People as stacks** (`draw.pose`, `draw.figure`, `draw.cast` and `draw.shade` in `src/viewer.js`). The hoplites are stacks too: the Blender figure, posed for the ranks (spear upright, shield brought round to the front), cut at each of eight moments of his stride and at four sizes, the finest twice as fine as a ship's because a man is small (69 levels; all four sheets together are 25 KB). A stack turns about the upright and no other way, so every other thing a figure does is another model to cut: a walk is eight, a thrust or a fall would be as many again.
+
+People come in numbers, so they do not get a picture each. Every picture a hoplite can show (this moment of the stride, facing this one of 64 ways) is put together once, in a cell of a sheet that every hoplite of that size is then drawn from; the cell longest unused gives way when the sheet is full. A soldier is then one sprite, as in any old game, and a company in step is fifty sprites from one texture. Their shadows are kept on a second sheet and laid down first, together: each marks the picture's alpha, the lowest mark stays, and the ground is darkened once by what is marked, so that fifty men in close order shade one patch of ground and do not stand in a pool of ink. Measured in Chrome with the phalanx in view, the page's own work for a frame is the same as with the rendered sprites (about 0.2 ms).
 
 **Walking behind things.** The render knows how far south everything in the picture stands. `gen/tiles.mjs` keeps that as tiles of the scenery's height (`world/occ`), every path point carries the height of its ground, and the sprite shader compares the two: the part of a walker that is behind a house, a wall, a tree or a hill is not drawn. Ships pass behind headlands the same way.
 
@@ -135,7 +140,7 @@ The units and the landmarks' moving parts are made in Blender (5.x), before `npm
 
 ```
 blender --background --factory-startup --python units/build.py -- --grid 8 --big     # the units -> units/out     (half a minute)
-blender --background --factory-startup --python units/stack.py                       # the sprite stacks (the ships) -> units/out  (half a minute)
+blender --background --factory-startup --python units/stack.py                       # the sprite stacks (the ships, the hoplite) -> units/out  (half a minute)
 blender --background --factory-startup --python units/assets.py                      # the Blender-made landmark pieces -> gen/assets  (seconds; they are in the repository)
 node gen/build.mjs --anims                                          # the moving parts, as cubes -> units/anims/src
 blender --background --factory-startup --python units/anims.py     # rendered -> units/anims/out               (3 minutes)
@@ -185,7 +190,8 @@ python paint.py --resume                                                   # car
 | Terrain, climate, colours, what grows where | `gen/region.mjs`, `gen/fields.mjs`, `gen/palette.mjs` | world, cond, paint, detail, tiles |
 | Who walks where | `gen/life.mjs` (paths), `src/life.js` (who, how many, how fast, who stays out at night) | refresh for paths; reload for the rest |
 | What the units look like | `units/build.py` | Blender, then overlays |
-| The ships, or which units are sprite stacks | `STACKS` in `units/stack.py` (a ship itself is `ship` in `units/build.py`); their light in `FS_STACK` in `src/viewer.js` | Blender (`units/stack.py`), then `node gen/stacks.mjs` |
+| The ships, or which units are sprite stacks | `STACKS` in `units/stack.py` (a ship itself is `ship` in `units/build.py`, a person `human`); their light in `FS_STACK` in `src/viewer.js` | Blender (`units/stack.py`), then `node gen/stacks.mjs` |
+| The phalanx: where it drills, how many, how close | `company(...)`, `RANK` and `FILE` in `src/life.js` | none |
 | How a landmark's parts move | its `tick` in `gen/landmarks.js` | anims, Blender, then overlays |
 | Ships, clouds, effects | `src/actors.js` | reload |
 | The length of a day, the lamps | `src/main.js` | reload |

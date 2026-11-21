@@ -15,6 +15,10 @@ Blender is only needed for the models themselves, which are the ones of units/bu
 rendered. Each is cut at several sizes (cubes to the map voxel), a coarser one for when it is seen small,
 and each size has a page of its own, so that the map need fetch only the size it is showing.
 
+The ships are kept this way, and one of the people: the hoplite, cut at each moment of his stride. A stack
+turns about the upright and no other way, so whatever else a figure does (a step, a thrust, a fall) is
+another model to cut; the map piles each up once and lets every man in that pose share the picture.
+
 A page has two halves. In the upper a slice's pixel holds the colour of that cube of the model. The
 same place in the lower half holds what the map needs to know to light the cube as the model turns (the
 sun stays where it is while a ship comes about), each in a colour channel of its own so that it survives
@@ -42,6 +46,7 @@ arg = lambda name, dflt=None: argv[argv.index(name) + 1] if name in argv else df
 
 STEP = 0.4      # a surface is sampled this far apart, in cubes of the grid it is cut into
 THIN = 0.2      # a rope thinner than this (its radius, in those cubes) is left out: it would be drawn as thick as a mast
+SPEAR = 0.1     # the same for a person, whose spear is worth a cube even when he is six cubes tall
 PLANK = 1.0     # how tall a strake of planking is, in the model's own cubes
 
 
@@ -61,17 +66,19 @@ UB = _units()
 
 
 
-def of(unit, frames=8, **more):
+def of(unit, frames=8, grids=(4, 2, 1), start=0.5, **more):
     """One of build.py's UNITS as a stack: its builder and options (with `more` over them) and its size there.
-    frames: how many moments of its movement are cut (1 for something that only sails)."""
+    frames: how many moments of its movement are cut (1 for something that only sails).
+    start: where in the movement frame 0 is, the one shown when it is not moving."""
     u = UB.UNITS[unit]
-    return (u[0].__name__, {**u[1], **more}, u[5] if len(u) > 5 else 1, frames, (4, 2, 1))
+    return (u[0].__name__, {**u[1], **more}, u[5] if len(u) > 5 else 1, frames, grids, start)
 
 
 # name: (the builder in build.py, its options, its size as in build.py's UNITS, frames of its movement,
-#        the sizes it is cut at: cubes of the grid to the map voxel, finest first)
+#        the sizes it is cut at: cubes of the grid to the map voxel, finest first; where frame 0 is)
 # The galleys pull properly at the oars (stroke: the blades go in as they are drawn aft and come out for the
-# return), with more oars a side than their rendered sprites had, and a bench of rowers for them.
+# return), with more oars a side than their rendered sprites had, and a bench of rowers for them. Frame 0 of
+# a ship is the one for lying still: the oars level and clear of the water, at the middle of their return.
 STACKS = {
     "odysseus": of("odysseus", stroke=True, oars=12, crew=9),
     "argo": of("argo", stroke=True, oars=12, crew=9),
@@ -79,16 +86,22 @@ STACKS = {
     "trireme": of("trireme", stroke=True, oars=13, crew=10),
     "merchant_ship": of("merchant_ship", frames=1),
     "merchant_ship2": of("merchant_ship2", frames=1),
+    # A hoplite as he marches in the ranks: spear upright, shield brought round to the front, eight moments
+    # of his stride (frame 0 has his feet together, for standing). A man is small, so he is cut twice as fine.
+    "hoplite": of("hoplite", grids=(8, 4, 2, 1), start=0, arms="march", spear="up", shaft="wood", shieldturn=32, shieldrim="bronze2"),
 }
 
 
 def build(name, t, grid):
     """The model at one moment of its movement, without what is too thin to show at this grid (cubes to the model's cube)."""
     fn, opts = STACKS[name][:2]
+    thin = THIN
+    if fn == "human":
+        opts, thin = {**opts, "bobgrid": grid}, SPEAR
 
     class Model(UB.Model):
         def limb(self, p0, p1, r0, r1, col, n=8, caps=True):
-            if max(r0, r1) * self.stack[-1].to_scale()[0] * grid < THIN:
+            if max(r0, r1) * self.stack[-1].to_scale()[0] * grid < thin:
                 return self
             return super().limb(p0, p1, r0, r1, col, n, caps)
 
@@ -200,16 +213,16 @@ def write_png(path, arr):
 
 def make(name):
     """One model, cut and packed, a page for each size. Returns what the map needs to know about it."""
-    _, _, size, nframes, grids = STACKS[name]
+    fn, opts, size, nframes, grids, start = STACKS[name]
+    planks = (opts.get("hull", "wood2"),) if fn == "ship" else ()
     sets = []
     for r in grids:
         grid = r * UB.MV * size   # cubes of the grid to the model's cube
         rects, seen = [], {}      # rects: (colours, notes, x from the middle, y from the middle), as they are met
         frames, reach, tall, half = [], 0.0, 0, [0.0, 0.0]
         for f in range(nframes):
-            # Frame 0 is the one for lying still: the oars level and clear of the water, at the middle of their return.
             levels = []
-            for sl in slices(build(name, (f / nframes + 0.5) % 1, grid), grid, (STACKS[name][1].get("hull", "wood2"),)):
+            for sl in slices(build(name, (f / nframes + start) % 1, grid), grid, planks):
                 if sl is None:
                     levels.append(-1)
                     continue
@@ -250,7 +263,8 @@ def make(name):
                          file=file, w=W, h=int(H * 2), notes=int(H), frames=frames,
                          rects=[[at[i][0], at[i][1], rects[i][0].shape[1], rects[i][0].shape[0], rects[i][2], rects[i][3]] for i in range(len(rects))]))
         print(f"stack {name}: {r} to the map voxel, {tall} levels, {len(rects)} slices on {W} x {H * 2}", flush=True)
-    return dict(frames=nframes, sets=sets)
+    # kind: what it is (ship, human), which decides how the map keeps its pictures.
+    return dict(kind=fn, frames=nframes, sets=sets)
 
 
 def main():

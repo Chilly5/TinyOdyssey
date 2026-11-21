@@ -167,7 +167,8 @@ void main() { o = vec4(texture(uTex, vUV).r, 0.0, 0.0, 1.0); }`;
 // A sprite stack (units/stack.py) is a model kept as flat slices, one for each step of its height. Its
 // picture is put together here whenever it turns: every slice drawn into a small picture of its own,
 // each a little higher than the one below and all turned by the same angle, in hard pixels. That small
-// picture is then drawn on the map like any other sprite.
+// picture is then drawn on the map like any other sprite. A ship has a picture to itself (draw.stack);
+// people, who come in numbers, share theirs (draw.pose).
 const VS_STACK = `#version 300 es
 in vec2 aPos;    // pixels of the picture being made
 in vec2 aUV;     // texels of the sheet of slices
@@ -189,7 +190,7 @@ const FS_STACK = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
 uniform vec2 uTurn;    // cosine and sine of the way it is heading (0 east, then clockwise on the map)
-uniform float uShade;  // how dark its shadow lies on the water
+uniform vec4 uShadow;  // what its shadow is written as: a dark blue as strong as the daylight, or a plain mark
 uniform int uNotes;    // how many rows below a slice its notes are
 in vec2 vUV;
 in vec4 vCol;
@@ -198,7 +199,7 @@ void main() {
   ivec2 at = ivec2(vUV);
   vec4 c = texelFetch(uTex, at, 0);
   if (c.a < 0.5) discard;
-  if (vCol.a < 0.0) { o = vec4(0.03, 0.05, 0.17, 1.0) * uShade; return; }
+  if (vCol.a < 0.0) { o = uShadow; return; }
   vec3 note = texelFetch(uTex, at + ivec2(0, uNotes), 0).rgb;
   vec3 col = c.rgb;
   if (vCol.r > 0.5 && note.g > 0.5) col = mix(col, vec3(1.0, 0.98, 0.89), 0.08);
@@ -233,6 +234,30 @@ void main() {
     if (q.a > 0.9) sum += q;
   }
   o = sum.a > 0.5 ? vec4(sum.rgb / sum.a * vec3(0.5, 0.48, 0.58), 1.0) : c;
+}`;
+
+// A shadow laid on the ground by draw.shade(). The picture's alpha is 1 everywhere; a shadow lowers it
+// by its own strength, and where several cross only the lowest is kept (they are blended with gl.MIN).
+// shade() then darkens the view once by what has been marked. Hidden behind scenery as a sprite is.
+const FS_CAST = `#version 300 es
+precision highp float;
+uniform sampler2D uTex;
+uniform sampler2D uOcc;
+uniform vec2 uTexSize;
+uniform vec2 uRes;
+uniform vec4 uCam;
+in vec2 vUV;
+in vec4 vCol;
+in vec2 vImg;
+in float vZ;
+out vec4 o;
+${GLSL_SHARP}
+void main() {
+  if (vZ >= 0.0 && uCam.w > 0.5) {
+    float h = texture(uOcc, gl_FragCoord.xy / uRes).r * 255.0;
+    if ((vImg.y - uCam.x + uCam.z * h) / uCam.y > vZ + 4.0) discard;
+  }
+  o = vec4(0.0, 0.0, 0.0, 1.0 - sharp(uTex, vUV / uTexSize, uTexSize).r * vCol.a);
 }`;
 
 // Lamps at night: each a soft round glow, added together into a picture of the light on the scene.
@@ -407,6 +432,7 @@ export function createViewer(canvas, manifest, base) {
   const progOcc = program(gl, VS_TILE, FS_OCC);
   const progStack = program(gl, VS_STACK, FS_STACK);
   const progRim = program(gl, VS_QUAD, FS_RIM);
+  const progCast = program(gl, VS_SPRITE, FS_CAST);
   const progLight = program(gl, VS_LIGHT, FS_LIGHT);
   const progBright = program(gl, VS_QUAD, FS_BRIGHT);
   const progBlur = program(gl, VS_QUAD, FS_BLUR);
@@ -665,61 +691,184 @@ export function createViewer(canvas, manifest, base) {
       pic.holder[pic.slot] = null;
       pics.delete(pic);
     }
+    for (const set of figSets) if (set.used <= tick - 900) shutCells(set);
   };
-  // Put a stack's picture together: frame f of it, heading `turn` (radians), at one of its sizes.
-  const compose = (set, pic, f, turn, shade) => {
-    flush(); // whatever of the scene is waiting goes out first
-    const c = Math.cos(turn), s = Math.sin(turn);
-    const p = set.p, kz = M.kz, ky = M.ky;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, set.a.fb);
-    gl.viewport(0, 0, set.w, set.h);
-    gl.disable(gl.BLEND); // a slice covers what is under it; nothing here is see-through but the shadow, drawn first
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+  // What follows draws a stack's slices into a small picture, w by h, with the model's middle at (ax, ay).
+  const SHADOW = packCol(0, 0, 0, -1), SIDE = packCol(0, 0, 0, 1), TOP = packCol(1, 0, 0, 1);
+  const slicing = (set, w, h, c, s, r, g, b, a) => {
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.BLEND); // a slice covers what is under it
     gl.useProgram(progStack.p);
-    gl.uniform2f(progStack.u.uRes, set.w, set.h);
+    gl.bindVertexArray(spriteVAO);
+    gl.uniform2f(progStack.u.uRes, w, h);
     gl.uniform2f(progStack.u.uTurn, c, s);
-    gl.uniform1f(progStack.u.uShade, shade);
+    gl.uniform4f(progStack.u.uShadow, r, g, b, a);
     gl.uniform1i(progStack.u.uNotes, set.notes);
     gl.uniform1i(progStack.u.uTex, 0);
     gl.bindTexture(gl.TEXTURE_2D, set.tex);
-    const levels = set.frames[f % set.frames.length];
-    const slice = (k, dx, dy, col) => {
-      const r = set.rects[levels[k]];
-      if (!r) return;
-      // The slice's corner, turned about the model's middle, squeezed as the ground is, and moved.
-      const x = r[4], y = r[5];
-      pushTurned(set.ax + (x * c - y * s) * p + dx, set.ay + (x * s + y * c) * p * kz + dy, c * p, s * p * kz, -s * p, c * p * kz, r[0], r[1], r[2], r[3], col);
-    };
-    const SHADOW = packCol(0, 0, 0, -1), SIDE = packCol(0, 0, 0, 1), TOP = packCol(1, 0, 0, 1);
-    // Its shadow first, flat on the water: each level thrown as far to the south-east as it is high (twice
-    // within its height, so that the shadow of something thin, a sail seen edge on, has no gaps).
-    if (shade > 0.01) for (let k = 0; k < levels.length * 2; k++) slice(k >> 1, SUN * (k + 0.5) * 0.5 * p, SUN * (k + 0.5) * 0.5 * p * kz, SHADOW);
+  };
+  // One level: its corner turned about the model's middle, squeezed as the ground is, and moved by (dx, dy).
+  const slice = (set, r, c, s, ax, ay, dx, dy, col) => {
+    if (!r) return;
+    const p = set.p, kz = M.kz, x = r[4], y = r[5];
+    pushTurned(ax + (x * c - y * s) * p + dx, ay + (x * s + y * c) * p * kz + dy, c * p, s * p * kz, -s * p, c * p * kz, r[0], r[1], r[2], r[3], col);
+  };
+  // The shadow, flat on the ground: each level thrown as far to the south-east as it is high (twice within
+  // its height, so that the shadow of something thin, a sail seen edge on or a spear, has no gaps).
+  const thrown = (set, levels, c, s, ax, ay) => {
+    const d = SUN * 0.5 * set.p;
+    for (let k = 0; k < levels.length * 2; k++) slice(set, set.rects[levels[k >> 1]], c, s, ax, ay, d * (k + 0.5), d * (k + 0.5) * M.kz, SHADOW);
+  };
+  // The pile itself. Each level is as thick on the screen as it is tall: drawn again a pixel higher until the next begins.
+  const piled = (set, levels, c, s, ax, ay) => {
     for (let k = 0; k < levels.length; k++) {
-      // Each level is as thick on the screen as it is tall: drawn again a pixel higher until the next begins.
-      const top = Math.round((k + 1) * p * ky);
-      for (let up = Math.round(k * p * ky) + 1; up <= top; up++) slice(k, 0, -up, up === top ? TOP : SIDE);
+      const top = Math.round((k + 1) * set.p * M.ky);
+      for (let up = Math.round(k * set.p * M.ky) + 1; up <= top; up++) slice(set, set.rects[levels[k]], c, s, ax, ay, 0, -up, up === top ? TOP : SIDE);
     }
-    flush();
-    // The line round it, and smaller copies for when it is seen from far off.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, pic.fb);
+  };
+  // The picture in `from`, w by h, with a line put round it, into whatever is bound and wherever the viewport is.
+  const rimmed = (from, w, h) => {
     gl.bindVertexArray(quad);
     gl.useProgram(progRim.p);
-    gl.bindTexture(gl.TEXTURE_2D, set.a.tex);
+    gl.bindTexture(gl.TEXTURE_2D, from);
     gl.uniform1i(progRim.u.uTex, 0);
-    gl.uniform2f(progRim.u.uPx, 1 / set.w, 1 / set.h);
+    gl.uniform2f(progRim.u.uPx, 1 / w, 1 / h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindTexture(gl.TEXTURE_2D, pic.tex);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    // And back to drawing the scene.
+  };
+  let prog = progSprite; // what the sprite batch is being drawn with (draw.shade changes it for a while)
+  const toScene = () => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.enable(gl.BLEND);
-    gl.useProgram(progSprite.p);
+    gl.useProgram(prog.p);
     gl.bindVertexArray(spriteVAO);
     gl.bindBuffer(gl.ARRAY_BUFFER, spriteBuf);
     sheet = -1;
   };
+  // Put a ship's picture together: frame f of it, heading `turn` (radians), at one of its sizes.
+  const compose = (set, pic, f, turn, shade) => {
+    flush(); // whatever of the scene is waiting goes out first
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const levels = set.frames[f % set.frames.length];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, set.a.fb);
+    slicing(set, set.w, set.h, c, s, 0.03 * shade, 0.05 * shade, 0.17 * shade, shade);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    if (shade > 0.01) thrown(set, levels, c, s, set.ax, set.ay); // its shadow first, on the water
+    piled(set, levels, c, s, set.ax, set.ay);
+    flush();
+    // The line round it, and smaller copies for when it is seen from far off.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pic.fb);
+    rimmed(set.a.tex, set.w, set.h);
+    gl.bindTexture(gl.TEXTURE_2D, pic.tex);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    toScene();
+  };
+
+  // --- Figures: stacks that many share ---------------------------------------------------
+  // A ship has a picture of its own. People come in numbers and march in step, so each picture one of them
+  // can show (this moment of the stride, facing this way) is put together once, in a cell of a sheet that
+  // everyone of that kind and size is then drawn from: a soldier is one sprite, as in any old game, and a
+  // company of them one batch. Their shadows are kept apart, on a second sheet, so that they can be laid
+  // down first and together (draw.shade).
+  // A sheet holds so many pictures of one figure at one size (set.n: more of the small ones, which are cheap and
+  // are what a wide view full of people needs); the one longest unused gives way to a new one.
+  const CELLS = 512;   // more than any sheet holds: a picture is known by its size and its cell together
+  const FACINGS = 64;  // the ways a figure can face
+  const figSets = new Set(); // the sizes that have sheets now
+  const cellSheet = (cw, ch, n, format, kind) => {
+    let W = 256;
+    while (W < 2048 && W * W < n * cw * ch) W *= 2;
+    const cols = Math.max(1, Math.floor(W / cw)), H = Math.ceil(n / cols) * ch;
+    const t = { fb: gl.createFramebuffer(), tex: texture(), w: W, h: H, cols, sheet: freeSheets.length ? freeSheets.pop() : stackSheet++ };
+    gl.bindTexture(gl.TEXTURE_2D, t.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, W, H, 0, kind, gl.UNSIGNED_BYTE, null);
+    // Half-size copies too, for when it is seen a little smaller than drawn. No smaller: a cell would run into the next.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 1);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.tex, 0);
+    sheets[t.sheet] = { tex: t.tex, w: W, h: H };
+    return t;
+  };
+  const openCells = (set) => {
+    set.body = cellSheet(set.bw, set.bh, set.n, gl.RGBA8, gl.RGBA);
+    set.cast = cellSheet(set.cw, set.ch, set.n, gl.R8, gl.RED);
+    set.a = { fb: gl.createFramebuffer(), tex: texture(gl.NEAREST), w: 0, h: 0 }; // where a figure is piled up before it gets its outline
+    sizeTarget(set.a, set.bw, set.bh);
+    set.where = new Map(); // frame and facing -> cell
+    set.keys = new Int32Array(set.n).fill(-1);
+    set.uses = new Int32Array(set.n);
+    figSets.add(set);
+    toScene();
+  };
+  const shutCells = (set) => {
+    for (const t of [set.body, set.cast]) {
+      gl.deleteFramebuffer(t.fb);
+      gl.deleteTexture(t.tex);
+      sheets[t.sheet] = undefined;
+      freeSheets.push(t.sheet);
+    }
+    gl.deleteFramebuffer(set.a.fb);
+    gl.deleteTexture(set.a.tex);
+    set.body = set.cast = set.a = null;
+    figSets.delete(set);
+  };
+  // Put a figure's picture together in cell i: frame f, facing `turn`. Its shadow goes into the same cell of the other sheet.
+  const composeCell = (set, i, f, turn) => {
+    flush();
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const levels = set.frames[f % set.frames.length];
+    const B = set.body, S = set.cast;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, set.a.fb);
+    slicing(set, set.bw, set.bh, c, s, 1, 1, 1, 1);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    piled(set, levels, c, s, set.bx, set.by);
+    flush();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, B.fb);
+    gl.viewport((i % B.cols) * set.bw, Math.floor(i / B.cols) * set.bh, set.bw, set.bh);
+    rimmed(set.a.tex, set.bw, set.bh);
+    const x = (i % S.cols) * set.cw, y = Math.floor(i / S.cols) * set.ch;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.fb);
+    slicing(set, set.cw, set.ch, c, s, 1, 1, 1, 1);
+    gl.viewport(x, y, set.cw, set.ch);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(x, y, set.cw, set.ch);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.disable(gl.SCISSOR_TEST);
+    thrown(set, levels, c, s, set.sx, set.sy);
+    flush();
+    B.stale = S.stale = true;
+    toScene();
+  };
+  // The half-size copies of a sheet are made when it is next drawn from, once for however many cells were filled.
+  const fresh = (t) => {
+    if (!t.stale) return;
+    flush();
+    gl.bindTexture(gl.TEXTURE_2D, t.tex);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    t.stale = false;
+    sheet = -1;
+  };
+  // The cell that holds a figure at frame f, facing step n of FACINGS; -1 if there is no room for another this frame.
+  const cellFor = (set, f, n) => {
+    const key = f * FACINGS + n;
+    let i = set.where.get(key);
+    if (i === undefined) {
+      i = 0;
+      for (let k = 1; k < set.n; k++) if (set.uses[k] < set.uses[i]) i = k;
+      if (set.uses[i] === tick) return -1;
+      if (set.keys[i] >= 0) set.where.delete(set.keys[i]);
+      set.keys[i] = key;
+      set.where.set(key, i);
+      composeCell(set, i, f, (n / FACINGS) * Math.PI * 2);
+    }
+    set.uses[i] = tick;
+    return i;
+  };
+  const shaded = [0, 0, 0, 0]; // how much of the picture the shadows of draw.shade() have reached
   const draw = {
     // A named frame with its anchor at (x, y). Options: flip, alpha, scale, shadow (flat colour silhouette).
     sprite(name, x, y, o) {
@@ -743,7 +892,7 @@ export function createViewer(canvas, manifest, base) {
         flush();
         sheet = k;
         gl.bindTexture(gl.TEXTURE_2D, sheets[k].tex);
-        gl.uniform2f(progSprite.u.uTexSize, sheets[k].w, sheets[k].h);
+        gl.uniform2f(prog.u.uTexSize, sheets[k].w, sheets[k].h);
       }
       return true;
     },
@@ -812,6 +961,100 @@ export function createViewer(canvas, manifest, base) {
       pushQuad(x0, ym, x1, y0 + set.h * s, 0, set.ay, set.w, set.h, WHITE, z, z < 0 ? z : z + ((set.h - set.ay) * s) / M.kz);
       draw.use(0);
       return true;
+    },
+    // A figure that many share (viewer.addStack of a person): frame f of its stride, facing `turn` radians
+    // (0 east, then clockwise as the map lies). Returns what cast() and figure() draw, or -1 until it can be
+    // drawn. Ask for everyone's before drawing any of them: a picture not yet made is made here.
+    pose(st, f, turn) {
+      const zd = viewer.zoom * viewer.dpr;
+      const need = viewer.pixel > 1 ? 0.99 / viewer.texel : zd * 0.85;
+      let i = 0;
+      for (let k = st.sets.length - 1; k > 0; k--) if (st.sets[k].q >= need) { i = k; break; }
+      wantSlices(st.sets[i]);
+      if (st.sets[i].state !== 2) {
+        let j = -1;
+        for (let k = i + 1; k < st.sets.length && j < 0; k++) if (st.sets[k].state === 2) j = k;
+        for (let k = i - 1; k >= 0 && j < 0; k--) if (st.sets[k].state === 2) j = k;
+        if (j < 0) {
+          wantSlices(st.sets[st.sets.length - 1]);
+          return -1;
+        }
+        i = j;
+      }
+      const set = st.sets[i];
+      if (!set.body) {
+        flush();
+        openCells(set);
+      }
+      set.used = tick;
+      // Sixty-four ways to face when it is seen large, half as many when small.
+      const coarse = set.q < 8 ? 2 : 1;
+      const n = (((Math.round((turn / (Math.PI * 2)) * (FACINGS / coarse)) * coarse) % FACINGS) + FACINGS) % FACINGS;
+      const cell = cellFor(set, ((f % st.frames) + st.frames) % st.frames, n);
+      return cell < 0 ? -1 : i * CELLS + cell;
+    },
+    // The figure pose() found, standing at (x, y). z as for frame().
+    figure(st, at, x, y, z = -1, alpha = 1) {
+      const set = st.sets[(at / CELLS) | 0], i = at % CELLS, B = set.body;
+      if (!B) return false;
+      fresh(B);
+      if (!draw.use(B.sheet)) return false;
+      const s = 1 / set.q;
+      const g = viewer.pixel > 1 ? Math.min(0.5, Math.max(viewer.texel, s)) : 1 / D;
+      const x0 = Math.round(x / g) * g - set.bx * s, y0 = Math.round(y / g) * g - set.by * s;
+      const u = (i % B.cols) * set.bw, v = Math.floor(i / B.cols) * set.bh;
+      pushQuad(x0, y0, x0 + set.bw * s, y0 + set.bh * s, u, v, u + set.bw, v + set.bh, alpha >= 1 ? WHITE : packCol(alpha, alpha, alpha, alpha), z < 0 ? z : z + 1);
+      return true;
+    },
+    // Its shadow on the ground, `a` strong (0..1). Only inside draw.shade().
+    cast(st, at, x, y, z = -1, a = 0.36) {
+      const set = st.sets[(at / CELLS) | 0], i = at % CELLS, S = set.cast;
+      if (!S) return;
+      fresh(S);
+      if (!draw.use(S.sheet)) return;
+      const s = 1 / set.q;
+      const g = viewer.pixel > 1 ? Math.min(0.5, Math.max(viewer.texel, s)) : 1 / D;
+      const x0 = Math.round(x / g) * g - set.sx * s, y0 = Math.round(y / g) * g - set.sy * s;
+      const u = (i % S.cols) * set.cw, v = Math.floor(i / S.cols) * set.ch;
+      // It lies on the ground, so each row of it is as far south as it is far down the picture.
+      pushQuad(x0, y0, x0 + set.cw * s, y0 + set.ch * s, u, v, u + set.cw, v + set.ch, packCol(0, 0, 0, a), z < 0 ? z : Math.max(0, z - (set.sy * s) / M.kz), z < 0 ? z : z + ((set.ch - set.sy) * s) / M.kz);
+      shaded[0] = Math.min(shaded[0], x0); shaded[1] = Math.min(shaded[1], y0);
+      shaded[2] = Math.max(shaded[2], x0 + set.cw * s); shaded[3] = Math.max(shaded[3], y0 + set.ch * s);
+    },
+    // Shadows laid on the ground together: fn draws them with draw.cast(). Where several cross, the ground is
+    // darkened once and not once for each (a company of men would otherwise stand in a pool of ink): each
+    // marks the picture's alpha, the lowest mark stays, and then the view is darkened by the marks and they
+    // are wiped (FS_CAST).
+    shade(fn) {
+      const w = atlas.frames.white;
+      if (!w) return;
+      flush();
+      prog = progCast;
+      gl.useProgram(prog.p);
+      sheet = -1;
+      gl.colorMask(false, false, false, true);
+      gl.blendEquation(gl.MIN);
+      shaded[0] = shaded[1] = 1e9;
+      shaded[2] = shaded[3] = -1e9;
+      fn();
+      flush();
+      prog = progSprite;
+      gl.useProgram(prog.p);
+      sheet = -1;
+      gl.blendEquation(gl.FUNC_ADD);
+      draw.use(0);
+      const wash = (col) => { // over as much of the picture as the shadows reached
+        pushQuad(shaded[0] - 1, shaded[1] - 1, shaded[2] + 1, shaded[3] + 1, w[0] + 1, w[1] + 1, w[0] + 2, w[1] + 2, col);
+        flush();
+      };
+      gl.colorMask(true, true, true, false);
+      gl.blendFunc(gl.ONE_MINUS_DST_ALPHA, gl.DST_ALPHA);
+      wash(packCol(0.03, 0.05, 0.17, 1));
+      gl.colorMask(false, false, false, true);
+      gl.blendFunc(gl.ONE, gl.ZERO);
+      wash(WHITE);
+      gl.colorMask(true, true, true, true);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     },
     // A soft dark oval on the ground under something.
     blob(x, y, rx, ry, a = 0.25, z = -1) {
@@ -945,6 +1188,7 @@ export function createViewer(canvas, manifest, base) {
     // Returns what draw.stack() wants.
     addStack(meta) {
       const st = { frames: meta.frames, sets: [], mine: [] };
+      const even = (n) => n + (n & 1);
       for (const m of meta.sets) { // finest first
         // Two pixels to the cube: a slice turned in hard pixels keeps its thin lines whole, and each cube shows a top and a side.
         const p = 2, q = m.r * p;
@@ -954,6 +1198,15 @@ export function createViewer(canvas, manifest, base) {
         set.ay = 2 + Math.ceil((tall * M.ky + m.reach * M.kz) * q);
         set.w = set.ax + reach + far + 2; // room for it at any heading, and for its shadow to the south-east
         set.h = set.ay + Math.ceil((m.reach * q + far) * M.kz) + 2;
+        // For a figure many share (draw.pose): the cell its picture fills, with its middle at (bx, by), and
+        // the cell its shadow fills, with its middle at (sx, sy). Even sizes, so that the half-size copies of
+        // one cell take nothing from the next.
+        set.bx = set.ax; set.by = set.ay;
+        set.bw = set.bx * 2; set.bh = even(set.by + Math.ceil(reach * M.kz) + 2);
+        set.sx = 2 + reach; set.sy = 2 + Math.ceil(reach * M.kz);
+        set.cw = even(set.sx + reach + far + 2); set.ch = even(set.sy + Math.ceil((reach + far) * M.kz) + 2);
+        set.body = set.cast = null;
+        set.n = q >= 16 ? 96 : q >= 8 ? 192 : 384;
         st.sets.push(set);
       }
       return st;
@@ -1076,14 +1329,17 @@ export function createViewer(canvas, manifest, base) {
       // 2. Sprites over it.
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.useProgram(progSprite.p);
+      for (const pr of [progCast, progSprite]) { // shadows laid together (draw.shade) see the view as the sprites do
+        gl.useProgram(pr.p);
+        gl.uniform4fv(pr.u.uView, view);
+        gl.uniform2f(pr.u.uRes, W, H);
+        gl.uniform1i(pr.u.uTex, 0);
+        gl.uniform1i(pr.u.uOcc, 3);
+        gl.uniform4f(pr.u.uCam, M.oy, M.kz, M.ky, hiding ? 1 : 0);
+      }
+      prog = progSprite;
       gl.bindVertexArray(spriteVAO);
-      gl.uniform4fv(progSprite.u.uView, view);
-      gl.uniform2f(progSprite.u.uRes, W, H);
       gl.uniform2f(progSprite.u.uTexSize, atlas.w, atlas.h);
-      gl.uniform1i(progSprite.u.uTex, 0);
-      gl.uniform1i(progSprite.u.uOcc, 3);
-      gl.uniform4f(progSprite.u.uCam, M.oy, M.kz, M.ky, hiding ? 1 : 0);
       gl.activeTexture(gl.TEXTURE3);
       gl.bindTexture(gl.TEXTURE_2D, occT.tex);
       gl.activeTexture(gl.TEXTURE0);
