@@ -75,11 +75,13 @@ The viewer (`src/viewer.js`) is a small WebGL deep-zoom renderer with no depende
 - **The sea**, animated in a shader: surf running up the shore, swell lines that follow the coast, glints on open water.
 - **The little people** (`src/life.js`): travellers, carts and soldiers on the roads, townsfolk in the streets and markets, shepherds with their flocks, farmers in the fields, fishing boats, the watch round the walls, and creatures that keep to their own country (centaurs on Pelion, satyrs in Arcadia, Talos on his rounds of Crete). They follow paths laid out by `gen/life.mjs`.
 - **Who they are** (`src/people.js`). Every one of them can be clicked. A name, a trade, a family, something of the town they come from and what they are doing at this moment (which changes at dusk) are made, the same every time, from the number each was given and where their path lies: a road between two towns, a market, a wall, a field. The map then keeps pace with them until it is dragged away.
-- **Ships** on sea routes found with A* (`gen/routes.mjs`): Odysseus, the Argo, Theseus, merchants and warships.
+- **Ships** on sea routes found with A* (`gen/routes.mjs`): Odysseus, the Argo, Theseus, merchants and warships. Odysseus's galley is a sprite stack (below), so it comes about smoothly instead of snapping between headings.
 - **Landmark animation.** The landmarks' moving parts: Sisyphus and his boulder, the Minotaur pacing the Labyrinth, the Clashing Rocks.
 - **Sky**: clouds and their shadows, birds, Pegasus, Icarus, smoke, fire and lightning (`src/actors.js`).
 
 The people, animals and ships are small models built and rendered in **Blender** by `units/build.py`: about 45 kinds, each from 8 or 16 headings and through its walk. People and animals are made of round shapes (limbs with joints, heads with faces and hair, robes that flare) and rendered at four sizes, the largest for the closest zoom. The towns have their children and their old people too. Ships have a hull skinned over ribs, a rail, a bellied sail in cloths, round oars and spars, a ram and a curled stern post; they are rendered at three sizes. The landmarks' moving parts are rendered there too (`units/anims.py`): `gen/anims.mjs` writes each frame out as small cubes, leaving out the ones that stand behind scenery, and Blender lights and outlines them as it does the units.
+
+**A sprite stack** (`units/stack.py`, `draw.stack` in `src/viewer.js`). A rendered unit can face only the sixteen ways it was rendered. Odysseus's galley is kept differently: the same Blender model is cut level by level into flat pictures of what is there at that height, seen from straight above (109 of them at the finest of three sizes). Whenever the ship has turned a degree and a half, or moved an oar, the viewer draws the slices one over another into a small picture, each a little higher than the one below and all turned by the same angle, in hard pixels, two to the cube. That is the same squeeze the map's camera gives everything (0.6 for depth, 0.8 for height), so the pile sits in the picture like anything else. Beside each slice the sheet keeps which way every cube's surface faces, so the sun stays in the north-west as the ship comes about: a top is lit, a side takes one of three tones by where it now faces, and the whole throws a shadow on the water. The finished picture gets the units' dark outline and is then drawn like any sprite. Twelve oars a side pull a full stroke in eight frames, blades in the water on the way aft. Open the page with `?stacks=off` to see the rendered sprite it replaced.
 
 **Walking behind things.** The render knows how far south everything in the picture stands. `gen/tiles.mjs` keeps that as tiles of the scenery's height (`world/occ`), every path point carries the height of its ground, and the sprite shader compares the two: the part of a walker that is behind a house, a wall, a tree or a hill is not drawn. Ships pass behind headlands the same way.
 
@@ -123,7 +125,7 @@ python tiles.py                     # tiles -> world/tiles, and world/manifest.j
 
 After `python tiles.py`, run `node gen/build.mjs --pyramid --styles` so the manifest lists the painted picture beside the drawn ones.
 
-`node gen/build.mjs --refresh` redoes everything in `world/` except the picture: the paths, the height tiles, the lamps, the sprites and the labels. `node gen/build.mjs --overlays` redoes only what is drawn over the picture (sprites, the landmarks' animation, the units). Both leave the sprite sheets as PNG; `python tiles.py --sheets` packs them again.
+`node gen/build.mjs --refresh` redoes everything in `world/` except the picture: the paths, the height tiles, the lamps, the sprites and the labels. `node gen/build.mjs --overlays` redoes only what is drawn over the picture (sprites, the landmarks' animation, the units, the sprite stacks). Both leave the sprite sheets as PNG; `python tiles.py --sheets` packs them again.
 
 `npm run world` alone leaves a working site that shows the plain render. It also clears `world/`, so run `python tiles.py` again afterwards to put the painting back. To build a new world beside the one being served, use `node gen/build.mjs --out world.next` and `python tiles.py --world ../world.next`, and look at it with `http://127.0.0.1:8137/?world=world.next/`.
 
@@ -131,6 +133,7 @@ The units and the landmarks' moving parts are made in Blender (5.x), before `npm
 
 ```
 blender --background --factory-startup --python units/build.py -- --grid 8 --big     # the units -> units/out     (half a minute)
+blender --background --factory-startup --python units/stack.py                       # the sprite stacks -> units/out  (ten seconds)
 blender --background --factory-startup --python units/assets.py                      # the Blender-made landmark pieces -> gen/assets  (seconds; they are in the repository)
 node gen/build.mjs --anims                                          # the moving parts, as cubes -> units/anims/src
 blender --background --factory-startup --python units/anims.py     # rendered -> units/anims/out               (3 minutes)
@@ -139,6 +142,8 @@ blender --background --factory-startup --python units/anims.py -- --only corinth
 ```
 
 Without them the world still builds: there are no walkers, and the moving parts are flattened in the old way.
+
+`node gen/stacks.mjs` puts freshly cut sprite stacks into a world that is already built, and touches nothing else in it.
 
 The painter needs an NVIDIA card with about 10 GB of free memory and its own Python environment:
 
@@ -178,6 +183,7 @@ python paint.py --resume                                                   # car
 | Terrain, climate, colours, what grows where | `gen/region.mjs`, `gen/fields.mjs`, `gen/palette.mjs` | world, cond, paint, detail, tiles |
 | Who walks where | `gen/life.mjs` (paths), `src/life.js` (who, how many, how fast, who stays out at night) | refresh for paths; reload for the rest |
 | What the units look like | `units/build.py` | Blender, then overlays |
+| Odysseus's galley, or which units are sprite stacks | `STACKS` in `units/stack.py` (the ship itself is `ship` in `units/build.py`); its light in `FS_STACK` in `src/viewer.js` | Blender (`units/stack.py`), then `node gen/stacks.mjs` |
 | How a landmark's parts move | its `tick` in `gen/landmarks.js` | anims, Blender, then overlays |
 | Ships, clouds, effects | `src/actors.js` | reload |
 | The length of a day, the lamps | `src/main.js` | reload |

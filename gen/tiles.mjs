@@ -9,6 +9,7 @@ import { encodePNG, decodePNG } from './png.mjs';
 import { buildLife } from './life.mjs';
 import { buildRoutes } from './routes.mjs';
 import { buildSprites } from './sprites.mjs';
+import { addStacks } from './stacks.mjs';
 import { KZ, KY } from './region.mjs';
 import { rim } from './palette.mjs';
 import { TILE, MODEL_PX } from './settings.mjs';
@@ -236,7 +237,10 @@ export function buildOverlays({ renderer, fields, sites, stamps, landmarks, S, r
     }
     lap(`units: ${Object.keys(units.units).length} kinds on ${units.pages.length} sheets, ${(bytes / 1e6).toFixed(1)} MB`);
   } else lap('units: none (run units/build.py in Blender to make them)');
-  return { sprites: { file: 'sprites.png', w: sprites.w, h: sprites.h, frames: sprites.meta }, anims: flip.anims, animPages: flip.pages, units };
+  // And the ones kept as sprite stacks (units/stack.py), which the viewer puts together itself.
+  const stacks = addStacks(out, unitDir) || undefined;
+  if (stacks) lap(`stacks: ${Object.keys(stacks).join(', ')}`);
+  return { sprites: { file: 'sprites.png', w: sprites.w, h: sprites.h, frames: sprites.meta }, anims: flip.anims, animPages: flip.pages, units, stacks };
 }
 
 // keepPicture: the folder already holds a finished world; redo everything in it except the picture
@@ -353,7 +357,7 @@ export async function buildWorld({ renderer, fields, sites, stamps, landmarks, e
       };
     }),
     anims: over.anims, animPages: over.animPages,
-    units, life: 'life.json', occ: occ.info,
+    units, stacks: over.stacks, life: 'life.json', occ: occ.info,
     effects: effects.map((e) => ({ ...e, x: Math.round(e.x * 10) / 10, y: Math.round(e.y * 10) / 10 })),
     voyage: {
       stops: routes.stops.map(sea),

@@ -68,6 +68,13 @@ async function boot() {
     }
   }
 
+  // What is kept as a sprite stack (units/stack.py): slices the viewer piles up and turns, so it faces any way.
+  // ?stacks=off shows the sixteen-heading sprite it replaced, to compare.
+  const stacked = new URLSearchParams(location.search).get('stacks') === 'off' ? {} : M.stacks || {};
+  for (const [kind, st] of Object.entries(stacked)) {
+    viewer.loadBitmap(`${BASE}${st.file}?v=${st.v}`, false).then((bmp) => actors.setStack(kind, viewer.addStack(bmp, st))).catch(() => {});
+  }
+
   const siteById = {};
   for (const s of SITES) siteById[s.id] = s;
   const place = {}; // id -> where the site is in the image

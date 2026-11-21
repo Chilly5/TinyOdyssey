@@ -568,11 +568,14 @@ def ship(m, t, o):
     if o.get("oars", 0):
         ph = math.sin(t * math.tau)
         k = o["oars"]
+        # stroke: the blades go into the water as they are drawn aft and are lifted clear for the return
+        # (units/stack.py asks for it; without it the oars are held up and only swing).
+        dip = -(16 + 8 * math.cos(t * math.tau)) if o.get("stroke") else 18 + abs(ph) * 6
         for i in range(k):
             x = -L * 0.3 + i * (L * 0.56 / max(1, k - 1))
             hw, zs = at(x)
             for sd in (1, -1):
-                m.at(x, sd * hw, zs + 0.3, rz=sd * (ph * 24), rx=sd * (18 + abs(ph) * 6))
+                m.at(x, sd * hw, zs + 0.3, rz=sd * (ph * 24), rx=sd * dip)
                 m.limb((0, 0, 0), (0, sd * 9.4, 0), 0.32, 0.28, "wood", 6)
                 m.ball(0, sd * 10.4, 0, 0.75, 1.5, 0.22, "wood", 6)
                 m.pop()

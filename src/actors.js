@@ -146,6 +146,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
     return ok;
   };
   const SHIP_UNIT = { odysseus: 'odysseus', argo: 'argo', theseus: 'theseus', trader0: 'merchant_ship', trader1: 'merchant_ship2', trader2: 'trireme' };
+  const stacks = {}; // the ships kept as sprite stacks (units/stack.py), by kind, once their sheets have loaded
 
   // --- Splashes ------------------------------------------------------------------
   const rings = Array.from({ length: 12 }, () => ({ t0: -10, x: 0, y: 0, size: 9 }));
@@ -175,13 +176,17 @@ export function createActors(viewer, M, calm, base = 'world/') {
   const p = {};
   const ships = []; // every one of them, for the visitor to pick and follow: { id (if it has a name), target }
   function makeShip(kind, label) {
-    const ship = { kind, x: 0, y: 0, k: 0, moving: false, wake: [], last: null, target: { x: 0, y: 0 }, ph: rnd() * 6 };
+    const ship = { kind, x: 0, y: 0, k: 0, moving: false, wake: [], last: null, target: { x: 0, y: 0 }, ph: rnd() * 6, course: 0, turn: null };
     ship.place = (path, dist, moving, dir = 1) => {
+      const fromX = ship.x, fromY = ship.y;
       path.at(dist, p);
       ship.x = p.x;
       ship.y = p.y;
       const dx = p.dx * dir, dz = (p.dy * dir) / KZ;
-      ship.k = ((Math.round((Math.atan2(dz, dx) / (Math.PI * 2)) * 16) % 16) + 16) % 16;
+      ship.course = Math.atan2(dz, dx); // 0 east, then clockwise as the map lies
+      ship.k = ((Math.round((ship.course / (Math.PI * 2)) * 16) % 16) + 16) % 16;
+      // Set down somewhere else (the voyage beginning again): it is facing its course already.
+      if (ship.turn === null || Math.hypot(p.x - fromX, p.y - fromY) > 60) ship.turn = ship.course;
       ship.moving = moving;
       ship.target.x = p.x;
       ship.target.y = p.y;
@@ -203,7 +208,18 @@ export function createActors(viewer, M, calm, base = 'world/') {
       const bob = calm ? 0 : Math.round(Math.sin(now * 2.1 + ship.ph) * 0.8);
       const oars = ship.moving && !calm ? Math.floor(now * 2.6 + ship.ph) : 0;
       // A ship is on the water, so a headland or an island nearer the camera hides it.
-      if (!unit(d, SHIP_UNIT[kind], ship.k, oars, ship.x, ship.y + bob, viewer.depthOf(ship.y))) d.sprite(`${kind}_${ship.k}`, ship.x, ship.y + bob);
+      const depth = viewer.depthOf(ship.y);
+      // One kept as a sprite stack faces exactly the way it is going, and pulls a whole stroke of the oars
+      // (frame 0 has them shipped, for lying still).
+      const st = stacks[kind];
+      if (st && d.stack(st, ship.moving && !calm ? Math.floor((now * 0.85 + ship.ph) * st.frames) % st.frames : 0, ship.turn, ship.x, ship.y + bob, depth)) return;
+      if (!unit(d, SHIP_UNIT[kind], ship.k, oars, ship.x, ship.y + bob, depth)) d.sprite(`${kind}_${ship.k}`, ship.x, ship.y + bob);
+    });
+    // It comes about over a moment, not at once: quickly enough to follow a winding course.
+    tickers.push((t, dt) => {
+      if (ship.turn === null) return;
+      const off = Math.atan2(Math.sin(ship.course - ship.turn), Math.cos(ship.course - ship.turn));
+      ship.turn += off * (1 - Math.exp(-dt * 3.2));
     });
     if (label) roaming.push({ id: label.id, name: label.name, kind: 'ship', tier: label.tier, target: ship.target, dy: 10 });
     ships.push({ id: label ? label.id : null, target: ship.target });
@@ -650,6 +666,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
     onBolt: null, // called with the effect when lightning strikes (for the thunder)
     onSplash: null, // called with x, y and size whenever something hits the water
     setLife(l) { life = l; },
+    setStack(kind, st) { stacks[kind] = st; },
     update(t, dt) {
       now = t;
       for (const f of tickers) f(t, dt);

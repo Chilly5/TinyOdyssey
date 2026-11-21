@@ -164,6 +164,77 @@ in vec2 vUV;
 out vec4 o;
 void main() { o = vec4(texture(uTex, vUV).r, 0.0, 0.0, 1.0); }`;
 
+// A sprite stack (units/stack.py) is a model kept as flat slices, one for each step of its height. Its
+// picture is put together here whenever it turns: every slice drawn into a small picture of its own,
+// each a little higher than the one below and all turned by the same angle, in hard pixels. That small
+// picture is then drawn on the map like any other sprite.
+const VS_STACK = `#version 300 es
+in vec2 aPos;    // pixels of the picture being made
+in vec2 aUV;     // texels of the sheet of slices
+in vec4 aCol;    // red: this copy of the slice is the one that shows its top; alpha below 0: its shadow
+uniform vec2 uRes;
+out vec2 vUV;
+out vec4 vCol;
+void main() {
+  vUV = aUV;
+  vCol = aCol;
+  gl_Position = vec4(aPos / uRes * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+// Under each slice on the sheet are its notes (units/stack.py): which way each cube's surface faces, and
+// whether its top shows. The sun stands in the north-west and the model is seen from the south, so a side
+// is lit by where it faces once the model has been turned: three flat tones for a side and one for a top,
+// as the map's own buildings have (gen/looks.mjs).
+const FS_STACK = `#version 300 es
+precision highp float;
+uniform sampler2D uTex;
+uniform vec2 uTurn;    // cosine and sine of the way it is heading (0 east, then clockwise on the map)
+uniform float uShade;  // how dark its shadow lies on the water
+uniform int uNotes;    // how many rows below a slice its notes are
+in vec2 vUV;
+in vec4 vCol;
+out vec4 o;
+void main() {
+  ivec2 at = ivec2(vUV);
+  vec4 c = texelFetch(uTex, at, 0);
+  if (c.a < 0.5) discard;
+  if (vCol.a < 0.0) { o = vec4(0.03, 0.05, 0.17, 1.0) * uShade; return; }
+  vec3 note = texelFetch(uTex, at + ivec2(0, uNotes), 0).rgb;
+  vec3 col = c.rgb;
+  if (vCol.r > 0.5 && note.g > 0.5) col = mix(col, vec3(1.0, 0.98, 0.89), 0.08);
+  else {
+    float a = floor(note.r * 31.875 + 0.5) * 0.19634954;
+    vec2 n = vec2(cos(a), sin(a));
+    vec2 w = vec2(n.x * uTurn.x - n.y * uTurn.y, n.x * uTurn.y + n.y * uTurn.x);
+    if (w.y < 0.0) w = -w;   // whichever face of it looks south is the one in sight
+    float sun = note.b > 0.5 ? -0.3 : dot(w, vec2(-0.7071, -0.7071));
+    col = sun > 0.2 ? mix(col, vec3(0.47, 0.48, 0.63), 0.1) * 0.94
+        : sun > -0.86 ? mix(col, vec3(0.36, 0.38, 0.58), 0.2) * 0.9
+        : mix(col, vec3(0.25, 0.27, 0.52), 0.34) * 0.82;
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// The stack's picture, finished: a line round it in a darker, bluer shade of whatever it runs along,
+// as the other units have (units/build.py).
+const FS_RIM = `#version 300 es
+precision highp float;
+uniform sampler2D uTex;
+uniform vec2 uPx;
+in vec2 uv;
+out vec4 o;
+void main() {
+  vec4 c = texture(uTex, uv);
+  if (c.a > 0.9) { o = c; return; }
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < 4; i++) {
+    vec2 d = i == 0 ? vec2(uPx.x, 0.0) : i == 1 ? vec2(-uPx.x, 0.0) : i == 2 ? vec2(0.0, uPx.y) : vec2(0.0, -uPx.y);
+    vec4 q = texture(uTex, uv + d);
+    if (q.a > 0.9) sum += q;
+  }
+  o = sum.a > 0.5 ? vec4(sum.rgb / sum.a * vec3(0.5, 0.48, 0.58), 1.0) : c;
+}`;
+
 // Lamps at night: each a soft round glow, added together into a picture of the light on the scene.
 const VS_LIGHT = `#version 300 es
 in vec2 aPos;
@@ -334,6 +405,8 @@ export function createViewer(canvas, manifest, base) {
   const progTile = program(gl, VS_TILE, FS_TILE);
   const progSprite = program(gl, VS_SPRITE, FS_SPRITE);
   const progOcc = program(gl, VS_TILE, FS_OCC);
+  const progStack = program(gl, VS_STACK, FS_STACK);
+  const progRim = program(gl, VS_QUAD, FS_RIM);
   const progLight = program(gl, VS_LIGHT, FS_LIGHT);
   const progBright = program(gl, VS_QUAD, FS_BRIGHT);
   const progBlur = program(gl, VS_QUAD, FS_BLUR);
@@ -519,16 +592,90 @@ export function createViewer(canvas, manifest, base) {
   const packCol = (r, g, b, a) => ((Math.round(a * 127) & 255) << 24 | (Math.round(b * 127) & 255) << 16 | (Math.round(g * 127) & 255) << 8 | (Math.round(r * 127) & 255)) >>> 0;
   const WHITE = packCol(1, 1, 1, 1);
   // z: how far south the thing stands, for hiding it behind scenery (see FS_SPRITE); -1 for never hidden.
-  const pushQuad = (x0, y0, x1, y1, u0, v0, u1, v1, col, z = -1) => {
+  // zb: the same for its bottom edge, when the thing lies on the ground and so comes nearer down the screen.
+  const pushQuad = (x0, y0, x1, y1, u0, v0, u1, v1, col, z = -1, zb = z) => {
     if (nq >= MAXQ) return;
     let o = nq * 36;
-    const put = (x, y, u, v) => {
-      vf[o] = x; vf[o + 1] = y; vf[o + 2] = u; vf[o + 3] = v; vu[o + 4] = col; vf[o + 5] = z;
+    const put = (x, y, u, v, d) => {
+      vf[o] = x; vf[o + 1] = y; vf[o + 2] = u; vf[o + 3] = v; vu[o + 4] = col; vf[o + 5] = d;
       o += 6;
     };
-    put(x0, y0, u0, v0); put(x1, y0, u1, v0); put(x0, y1, u0, v1);
-    put(x1, y0, u1, v0); put(x1, y1, u1, v1); put(x0, y1, u0, v1);
+    put(x0, y0, u0, v0, z); put(x1, y0, u1, v0, z); put(x0, y1, u0, v1, zb);
+    put(x1, y0, u1, v0, z); put(x1, y1, u1, v1, zb); put(x0, y1, u0, v1, zb);
     nq++;
+  };
+  // The same rectangle of a texture, turned: (ox, oy) its top left corner, (ax, ay) the step along its
+  // top edge for each texel and (bx, by) the step down its side.
+  const pushTurned = (ox, oy, ax, ay, bx, by, u0, v0, w, h, col) => {
+    if (nq >= MAXQ) flush();
+    let o = nq * 36;
+    const put = (i, j) => {
+      vf[o] = ox + ax * i + bx * j; vf[o + 1] = oy + ay * i + by * j; vf[o + 2] = u0 + i; vf[o + 3] = v0 + j; vu[o + 4] = col; vf[o + 5] = -1;
+      o += 6;
+    };
+    put(0, 0); put(w, 0); put(0, h);
+    put(w, 0); put(w, h); put(0, h);
+    nq++;
+  };
+
+  // --- Sprite stacks (units/stack.py) ----------------------------------------------------
+  // A shadow runs this many voxels east, and as many south, for each voxel of height (gen/bake.mjs).
+  const SUN = 0.8;
+  const TURN = Math.PI / 120; // the smallest turn that is drawn afresh
+  let stackSheet = 1000; // their finished pictures are sprite textures too, kept well clear of the others
+  // Put a stack's picture together: frame f of it, heading `turn` (radians), at one of its sizes.
+  const compose = (st, set, f, turn, shade) => {
+    flush(); // whatever of the scene is waiting goes out first
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const p = set.p, kz = M.kz, ky = M.ky;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, set.a.fb);
+    gl.viewport(0, 0, set.w, set.h);
+    gl.disable(gl.BLEND); // a slice covers what is under it; nothing here is see-through but the shadow, drawn first
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(progStack.p);
+    gl.uniform2f(progStack.u.uRes, set.w, set.h);
+    gl.uniform2f(progStack.u.uTurn, c, s);
+    gl.uniform1f(progStack.u.uShade, shade);
+    gl.uniform1i(progStack.u.uNotes, st.notes);
+    gl.uniform1i(progStack.u.uTex, 0);
+    gl.bindTexture(gl.TEXTURE_2D, st.tex);
+    const levels = set.frames[f % set.frames.length];
+    const slice = (k, dx, dy, col) => {
+      const r = st.rects[levels[k]];
+      if (!r) return;
+      // The slice's corner, turned about the model's middle, squeezed as the ground is, and moved.
+      const x = r[4], y = r[5];
+      pushTurned(set.ax + (x * c - y * s) * p + dx, set.ay + (x * s + y * c) * p * kz + dy, c * p, s * p * kz, -s * p, c * p * kz, r[0], r[1], r[2], r[3], col);
+    };
+    const SHADOW = packCol(0, 0, 0, -1), SIDE = packCol(0, 0, 0, 1), TOP = packCol(1, 0, 0, 1);
+    // Its shadow first, flat on the water: each level thrown as far to the south-east as it is high (twice
+    // within its height, so that the shadow of something thin, a sail seen edge on, has no gaps).
+    if (shade > 0.01) for (let k = 0; k < levels.length * 2; k++) slice(k >> 1, SUN * (k + 0.5) * 0.5 * p, SUN * (k + 0.5) * 0.5 * p * kz, SHADOW);
+    for (let k = 0; k < levels.length; k++) {
+      // Each level is as thick on the screen as it is tall: drawn again a pixel higher until the next begins.
+      const top = Math.round((k + 1) * p * ky);
+      for (let up = Math.round(k * p * ky) + 1; up <= top; up++) slice(k, 0, -up, up === top ? TOP : SIDE);
+    }
+    flush();
+    // The line round it, and smaller copies for when it is seen from far off.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, set.b.fb);
+    gl.bindVertexArray(quad);
+    gl.useProgram(progRim.p);
+    gl.bindTexture(gl.TEXTURE_2D, set.a.tex);
+    gl.uniform1i(progRim.u.uTex, 0);
+    gl.uniform2f(progRim.u.uPx, 1 / set.w, 1 / set.h);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindTexture(gl.TEXTURE_2D, set.b.tex);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    // And back to drawing the scene.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.enable(gl.BLEND);
+    gl.useProgram(progSprite.p);
+    gl.bindVertexArray(spriteVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, spriteBuf);
+    sheet = -1;
   };
   const draw = {
     // A named frame with its anchor at (x, y). Options: flip, alpha, scale, shadow (flat colour silhouette).
@@ -573,6 +720,33 @@ export function createViewer(canvas, manifest, base) {
       // head) stands that much nearer the camera, and must not be hidden by the level water or ground it is on.
       const near = z < 0 ? z : z + (Math.max(0, rec[4] - rec[6]) * s) / M.kz;
       pushQuad(x0, y0, x0 + rec[3] * s, y0 + rec[4] * s, rec[1], rec[2], rec[1] + rec[3], rec[2] + rec[4], alpha >= 1 ? WHITE : packCol(alpha, alpha, alpha, alpha), near);
+      return true;
+    },
+    // A sprite stack (viewer.addStack) with its middle at (x, y): frame f of its movement, heading `turn`
+    // radians (0 east, then clockwise as the map lies). z as for frame(). Returns false until it can be drawn.
+    stack(st, f, turn, x, y, z = -1) {
+      const zd = viewer.zoom * viewer.dpr;
+      const need = viewer.pixel > 1 ? 0.99 / viewer.texel : zd * 0.85;
+      let set = st.sets[0];
+      for (let i = st.sets.length - 1; i > 0; i--) if (st.sets[i].q >= need) { set = st.sets[i]; break; }
+      // Its picture is put together again only when it has turned enough to show (a degree and a half),
+      // moved an oar, or the light has changed.
+      const n = Math.round(turn / TURN), shade = (Math.round((1 - viewer.night) * 12) / 12) * 0.26;
+      const key = f + '/' + n + '/' + shade;
+      if (set.key !== key) {
+        compose(st, set, f, n * TURN, shade);
+        set.key = key;
+      }
+      if (!draw.use(set.sheet)) return false;
+      const s = 1 / set.q;
+      const g = viewer.pixel > 1 ? Math.min(0.5, Math.max(viewer.texel, s)) : 1 / D;
+      const x0 = Math.round(x / g) * g - set.ax * s, y0 = Math.round(y / g) * g - set.ay * s;
+      const x1 = x0 + set.w * s, ym = y0 + set.ay * s;
+      // What is above its middle stands about there. What is below lies on the water (the near side of the
+      // hull, the oars, the shadow) and so is nearer the camera row by row; scenery hides each part accordingly.
+      pushQuad(x0, y0, x1, ym, 0, 0, set.w, set.ay, WHITE, z < 0 ? z : z + 2);
+      pushQuad(x0, ym, x1, y0 + set.h * s, 0, set.ay, set.w, set.h, WHITE, z, z < 0 ? z : z + ((set.h - set.ay) * s) / M.kz);
+      draw.use(0);
       return true;
     },
     // A soft dark oval on the ground under something.
@@ -703,6 +877,32 @@ export function createViewer(canvas, manifest, base) {
     },
     // Where the units' sheets start among the sprite textures.
     setUnitSheet(at) { unitSheet = at; },
+    // Take in a sprite stack: the sheet of its slices and what units/stack.py wrote about it. Returns
+    // what draw.stack() wants.
+    addStack(bitmap, meta) {
+      const st = { tex: texture(gl.NEAREST), rects: meta.rects, frames: meta.frames, notes: meta.notes, sets: [] };
+      upload(st.tex, bitmap);
+      for (const m of meta.sets) { // finest first
+        // Two pixels to the cube: a slice turned in hard pixels keeps its thin lines whole, and each cube shows a top and a side.
+        const p = 2, q = m.r * p;
+        const tall = m.n / m.r, reach = Math.ceil(m.reach * q), far = Math.ceil(SUN * tall * q);
+        const set = { q, p, frames: m.frames, key: '', sheet: stackSheet++ };
+        set.ax = 2 + reach; // where the model's middle, at the waterline, comes in its picture
+        set.ay = 2 + Math.ceil((tall * M.ky + m.reach * M.kz) * q);
+        set.w = set.ax + reach + far + 2; // room for it at any heading, and for its shadow to the south-east
+        set.h = set.ay + Math.ceil((m.reach * q + far) * M.kz) + 2;
+        set.a = { fb: gl.createFramebuffer(), tex: texture(gl.NEAREST), w: 0, h: 0 };
+        set.b = { fb: gl.createFramebuffer(), tex: texture(), w: 0, h: 0 };
+        sizeTarget(set.a, set.w, set.h);
+        sizeTarget(set.b, set.w, set.h);
+        gl.bindTexture(gl.TEXTURE_2D, set.b.tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        sheets[set.sheet] = { tex: set.b.tex, w: set.w, h: set.h };
+        st.sets.push(set);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return st;
+    },
 
     // time in seconds; overlay(draw, layer) is called for layer 0 (on the sea) and 1 (in the air).
     render(time, overlay) {
