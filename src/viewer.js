@@ -203,7 +203,7 @@ void main() {
   vec3 col = c.rgb;
   if (vCol.r > 0.5 && note.g > 0.5) col = mix(col, vec3(1.0, 0.98, 0.89), 0.08);
   else {
-    float a = floor(note.r * 31.875 + 0.5) * 0.19634954;
+    float a = floor(note.r * 31.0 + 0.5) * 0.19634954;
     vec2 n = vec2(cos(a), sin(a));
     vec2 w = vec2(n.x * uTurn.x - n.y * uTurn.y, n.x * uTurn.y + n.y * uTurn.x);
     if (w.y < 0.0) w = -w;   // whichever face of it looks south is the one in sight
@@ -622,9 +622,52 @@ export function createViewer(canvas, manifest, base) {
   // A shadow runs this many voxels east, and as many south, for each voxel of height (gen/bake.mjs).
   const SUN = 0.8;
   const TURN = Math.PI / 120; // the smallest turn that is drawn afresh
-  let stackSheet = 1000; // their finished pictures are sprite textures too, kept well clear of the others
+  // Each size of a stack has a sheet of slices, fetched when that size is first wanted.
+  const wantSlices = (set) => {
+    if (set.state) return;
+    set.state = 1;
+    loadBitmap(`${base}${set.file}?v=${set.v}`, false).then((bmp) => {
+      set.tex = texture(gl.NEAREST);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      // Five bits a channel is plenty for flat colours and the notes beside them, and half the memory.
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB5_A1, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+      bmp.close?.();
+      set.state = 2;
+      viewer.dirty = true;
+    }).catch(() => { set.state = 3; });
+  };
+  // Every ship has a finished picture of its own (two of one model seldom head the same way). The pictures
+  // are sprite textures too, numbered well clear of the others, and are given up when the ship has not been
+  // in sight for a while.
+  const pics = new Set(), freeSheets = [];
+  let stackSheet = 1000;
+  const newPic = (set, holder, slot) => {
+    const pic = { fb: gl.createFramebuffer(), tex: texture(), w: 0, h: 0, key: '', used: tick, holder, slot, sheet: freeSheets.length ? freeSheets.pop() : stackSheet++ };
+    sizeTarget(pic, set.w, set.h);
+    gl.bindTexture(gl.TEXTURE_2D, pic.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    sheets[pic.sheet] = { tex: pic.tex, w: set.w, h: set.h };
+    pics.add(pic);
+    if (!set.a) { // where a picture is put together before it gets its outline: one for all ships of this model and size
+      set.a = { fb: gl.createFramebuffer(), tex: texture(gl.NEAREST), w: 0, h: 0 };
+      sizeTarget(set.a, set.w, set.h);
+    }
+    return pic;
+  };
+  const dropPics = () => {
+    for (const pic of pics) {
+      if (pic.used > tick - 900) continue;
+      gl.deleteFramebuffer(pic.fb);
+      gl.deleteTexture(pic.tex);
+      sheets[pic.sheet] = undefined;
+      freeSheets.push(pic.sheet);
+      pic.holder[pic.slot] = null;
+      pics.delete(pic);
+    }
+  };
   // Put a stack's picture together: frame f of it, heading `turn` (radians), at one of its sizes.
-  const compose = (st, set, f, turn, shade) => {
+  const compose = (set, pic, f, turn, shade) => {
     flush(); // whatever of the scene is waiting goes out first
     const c = Math.cos(turn), s = Math.sin(turn);
     const p = set.p, kz = M.kz, ky = M.ky;
@@ -637,12 +680,12 @@ export function createViewer(canvas, manifest, base) {
     gl.uniform2f(progStack.u.uRes, set.w, set.h);
     gl.uniform2f(progStack.u.uTurn, c, s);
     gl.uniform1f(progStack.u.uShade, shade);
-    gl.uniform1i(progStack.u.uNotes, st.notes);
+    gl.uniform1i(progStack.u.uNotes, set.notes);
     gl.uniform1i(progStack.u.uTex, 0);
-    gl.bindTexture(gl.TEXTURE_2D, st.tex);
+    gl.bindTexture(gl.TEXTURE_2D, set.tex);
     const levels = set.frames[f % set.frames.length];
     const slice = (k, dx, dy, col) => {
-      const r = st.rects[levels[k]];
+      const r = set.rects[levels[k]];
       if (!r) return;
       // The slice's corner, turned about the model's middle, squeezed as the ground is, and moved.
       const x = r[4], y = r[5];
@@ -659,14 +702,14 @@ export function createViewer(canvas, manifest, base) {
     }
     flush();
     // The line round it, and smaller copies for when it is seen from far off.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, set.b.fb);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pic.fb);
     gl.bindVertexArray(quad);
     gl.useProgram(progRim.p);
     gl.bindTexture(gl.TEXTURE_2D, set.a.tex);
     gl.uniform1i(progRim.u.uTex, 0);
     gl.uniform2f(progRim.u.uPx, 1 / set.w, 1 / set.h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindTexture(gl.TEXTURE_2D, set.b.tex);
+    gl.bindTexture(gl.TEXTURE_2D, pic.tex);
     gl.generateMipmap(gl.TEXTURE_2D);
     // And back to drawing the scene.
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
@@ -723,21 +766,42 @@ export function createViewer(canvas, manifest, base) {
       return true;
     },
     // A sprite stack (viewer.addStack) with its middle at (x, y): frame f of its movement, heading `turn`
-    // radians (0 east, then clockwise as the map lies). z as for frame(). Returns false until it can be drawn.
-    stack(st, f, turn, x, y, z = -1) {
+    // radians (0 east, then clockwise as the map lies). z as for frame(). mine: an array the caller keeps for
+    // this one ship, where its finished pictures are held. Returns false until it can be drawn.
+    stack(st, f, turn, x, y, z = -1, mine = st.mine) {
       const zd = viewer.zoom * viewer.dpr;
       const need = viewer.pixel > 1 ? 0.99 / viewer.texel : zd * 0.85;
-      let set = st.sets[0];
-      for (let i = st.sets.length - 1; i > 0; i--) if (st.sets[i].q >= need) { set = st.sets[i]; break; }
-      // Its picture is put together again only when it has turned enough to show (a degree and a half),
-      // moved an oar, or the light has changed.
-      const n = Math.round(turn / TURN), shade = (Math.round((1 - viewer.night) * 12) / 12) * 0.26;
-      const key = f + '/' + n + '/' + shade;
-      if (set.key !== key) {
-        compose(st, set, f, n * TURN, shade);
-        set.key = key;
+      let i = 0;
+      for (let k = st.sets.length - 1; k > 0; k--) if (st.sets[k].q >= need) { i = k; break; }
+      // The slices for that size may not have come yet: ask, and meanwhile make do with the nearest size that has.
+      wantSlices(st.sets[i]);
+      if (st.sets[i].state !== 2) {
+        let j = -1;
+        for (let k = i + 1; k < st.sets.length && j < 0; k++) if (st.sets[k].state === 2) j = k;
+        for (let k = i - 1; k >= 0 && j < 0; k--) if (st.sets[k].state === 2) j = k;
+        if (j < 0) {
+          wantSlices(st.sets[st.sets.length - 1]); // the smallest is soonest here
+          return false;
+        }
+        i = j;
       }
-      if (!draw.use(set.sheet)) return false;
+      const set = st.sets[i];
+      let pic = mine[i];
+      if (!pic) {
+        flush(); // making one changes what is bound
+        pic = mine[i] = newPic(set, mine, i);
+      }
+      pic.used = tick;
+      // Its picture is put together again only when it has turned enough to show (a degree and a half; three
+      // times that when it is seen small), moved an oar, or the light has changed.
+      const step = zd < 1.2 ? TURN * 3 : TURN;
+      const n = Math.round(turn / step), shade = (Math.round((1 - viewer.night) * 12) / 12) * 0.26;
+      const key = f + '/' + n * step + '/' + shade;
+      if (pic.key !== key) {
+        compose(set, pic, f, n * step, shade);
+        pic.key = key;
+      }
+      if (!draw.use(pic.sheet)) return false;
       const s = 1 / set.q;
       const g = viewer.pixel > 1 ? Math.min(0.5, Math.max(viewer.texel, s)) : 1 / D;
       const x0 = Math.round(x / g) * g - set.ax * s, y0 = Math.round(y / g) * g - set.ay * s;
@@ -877,30 +941,21 @@ export function createViewer(canvas, manifest, base) {
     },
     // Where the units' sheets start among the sprite textures.
     setUnitSheet(at) { unitSheet = at; },
-    // Take in a sprite stack: the sheet of its slices and what units/stack.py wrote about it. Returns
-    // what draw.stack() wants.
-    addStack(bitmap, meta) {
-      const st = { tex: texture(gl.NEAREST), rects: meta.rects, frames: meta.frames, notes: meta.notes, sets: [] };
-      upload(st.tex, bitmap);
+    // Take in a sprite stack: what units/stack.py wrote about it. Nothing is fetched until it is drawn.
+    // Returns what draw.stack() wants.
+    addStack(meta) {
+      const st = { frames: meta.frames, sets: [], mine: [] };
       for (const m of meta.sets) { // finest first
         // Two pixels to the cube: a slice turned in hard pixels keeps its thin lines whole, and each cube shows a top and a side.
         const p = 2, q = m.r * p;
         const tall = m.n / m.r, reach = Math.ceil(m.reach * q), far = Math.ceil(SUN * tall * q);
-        const set = { q, p, frames: m.frames, key: '', sheet: stackSheet++ };
+        const set = { q, p, frames: m.frames, rects: m.rects, notes: m.notes, file: m.file, v: m.v, tex: null, state: 0, a: null };
         set.ax = 2 + reach; // where the model's middle, at the waterline, comes in its picture
         set.ay = 2 + Math.ceil((tall * M.ky + m.reach * M.kz) * q);
         set.w = set.ax + reach + far + 2; // room for it at any heading, and for its shadow to the south-east
         set.h = set.ay + Math.ceil((m.reach * q + far) * M.kz) + 2;
-        set.a = { fb: gl.createFramebuffer(), tex: texture(gl.NEAREST), w: 0, h: 0 };
-        set.b = { fb: gl.createFramebuffer(), tex: texture(), w: 0, h: 0 };
-        sizeTarget(set.a, set.w, set.h);
-        sizeTarget(set.b, set.w, set.h);
-        gl.bindTexture(gl.TEXTURE_2D, set.b.tex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        sheets[set.sheet] = { tex: set.b.tex, w: set.w, h: set.h };
         st.sets.push(set);
       }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       return st;
     },
 
@@ -988,6 +1043,7 @@ export function createViewer(canvas, manifest, base) {
       for (const [t, tx, ty] of ready) drawTile(t, tx * span, ty * span, t.w * unit, t.h * unit, 0, 0, 1, 1);
       pump();
       evict();
+      if (tick % 120 === 0) dropPics();
 
       // 1b. The scenery's height over the same view, once close enough for it to matter.
       const hiding = !!OCC && zd >= 0.9;

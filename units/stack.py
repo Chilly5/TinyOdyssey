@@ -8,19 +8,22 @@ angle (src/viewer.js, draw.stack), and the pile reads as a solid thing that come
 
   blender --background --factory-startup --python units/stack.py -- [--only NAME,NAME] [--out DIR]
 
-  units/out/stack_<name>.png   every slice of one model, packed onto a page
-  units/out/stacks.json        where each slice is: for each size, for each frame, level by level
+  units/out/stack_<name>_<size>.png   every slice of one model at one size, packed onto a page
+  units/out/stacks.json               where each slice is: for each size, for each frame, level by level
 
 Blender is only needed for the models themselves, which are the ones of units/build.py; nothing is
-rendered. Each is cut at several sizes (cubes to the map voxel), a coarser one for when it is seen small.
+rendered. Each is cut at several sizes (cubes to the map voxel), a coarser one for when it is seen small,
+and each size has a page of its own, so that the map need fetch only the size it is showing.
 
-The page has two halves. In the upper a slice's pixel holds the colour of that cube of the model. The
+A page has two halves. In the upper a slice's pixel holds the colour of that cube of the model. The
 same place in the lower half holds what the map needs to know to light the cube as the model turns (the
 sun stays where it is while a ship comes about), each in a colour channel of its own so that it survives
 whatever a browser does to a picture's alpha:
-  red     which way its surface faces: 32 steps clockwise (as the slice is drawn) from the bow, times 8
+  red     which way its surface faces: 32 steps clockwise (as the slice is drawn) from the bow
   green   255 where nothing stands on the cube, so that its top shows
   blue    255 where its surface faces up or down more than sideways
+The map keeps a page at five bits a channel to save memory. Colours do not mind; the step in red is
+written as a value that comes back as the same step whether the five bits are cut or rounded.
 """
 import importlib.util
 import json
@@ -56,12 +59,26 @@ def _units():
 
 UB = _units()
 
+
+
+def of(unit, frames=8, **more):
+    """One of build.py's UNITS as a stack: its builder and options (with `more` over them) and its size there.
+    frames: how many moments of its movement are cut (1 for something that only sails)."""
+    u = UB.UNITS[unit]
+    return (u[0].__name__, {**u[1], **more}, u[5] if len(u) > 5 else 1, frames, (4, 2, 1))
+
+
 # name: (the builder in build.py, its options, its size as in build.py's UNITS, frames of its movement,
 #        the sizes it is cut at: cubes of the grid to the map voxel, finest first)
+# The galleys pull properly at the oars (stroke: the blades go in as they are drawn aft and come out for the
+# return), with more oars a side than their rendered sprites had, and a bench of rowers for them.
 STACKS = {
-    # Odysseus's ship as a war galley: twelve oars a side, pulled properly (the blades go in as they are drawn
-    # aft and come out for the return), and a bench of rowers for them.
-    "odysseus": ("ship", {**UB.UNITS["odysseus"][1], "stroke": True, "oars": 12, "crew": 9}, UB.UNITS["odysseus"][5], 8, (4, 2, 1)),
+    "odysseus": of("odysseus", stroke=True, oars=12, crew=9),
+    "argo": of("argo", stroke=True, oars=12, crew=9),
+    "theseus": of("theseus", stroke=True, oars=10, crew=7),
+    "trireme": of("trireme", stroke=True, oars=13, crew=10),
+    "merchant_ship": of("merchant_ship", frames=1),
+    "merchant_ship2": of("merchant_ship2", frames=1),
 }
 
 
@@ -161,7 +178,7 @@ def slices(m, grid, planks=()):
             rgb = np.where(np.isin(face_col[o[s]], planked)[:, None], (rgb * 0.88).astype(np.uint8), rgb)
         img[s, :3] = rgb
         img[s, 3] = 255
-        note[s, 0] = turn[o[s]] * 8
+        note[s, 0] = np.minimum(255, np.ceil(turn[o[s]] * 255 / 31) + 1)   # between step and step + 0.25, in 31sts
         note[s, 1] = np.where(open_top[s], 255, 0)
         note[s, 2] = np.where(flat[o[s]], 255, 0)
         note[s, 3] = 255
@@ -182,11 +199,12 @@ def write_png(path, arr):
 
 
 def make(name):
-    """One model, cut and packed. Returns what the map needs to know about it."""
+    """One model, cut and packed, a page for each size. Returns what the map needs to know about it."""
     _, _, size, nframes, grids = STACKS[name]
-    rects, seen, sets = [], {}, []   # rects: (colours, notes, x from the middle, y from the middle), as they are met
+    sets = []
     for r in grids:
         grid = r * UB.MV * size   # cubes of the grid to the model's cube
+        rects, seen = [], {}      # rects: (colours, notes, x from the middle, y from the middle), as they are met
         frames, reach, tall, half = [], 0.0, 0, [0.0, 0.0]
         for f in range(nframes):
             # Frame 0 is the one for lying still: the oars level and clear of the water, at the middle of their return.
@@ -206,33 +224,33 @@ def make(name):
                 half = [max(half[0], abs(ox), abs(ox + w)), max(half[1], abs(oy), abs(oy + h))]
             tall = max(tall, len(levels))
             frames.append(levels)
-        sets.append(dict(r=r, n=tall, reach=round(reach / r, 3), half=[round(half[0] / r, 3), round(half[1] / r, 3)], frames=frames))
-        print(f"stack {name}: {r} to the map voxel, {tall} levels", flush=True)
 
-    # Pack them on shelves, tallest first, with a clear pixel between (the map reads them unsmoothed).
-    order = sorted(range(len(rects)), key=lambda i: -rects[i][0].shape[0])
-    area = sum((rects[i][0].shape[0] + 2) * (rects[i][0].shape[1] + 2) for i in order)
-    W = 1024 if area < 900_000 else 2048
-    at, x, y, shelf = {}, 1, 1, 0
-    for i in order:
-        h, w = rects[i][0].shape[:2]
-        if x + w + 1 > W:
-            x, y, shelf = 1, y + shelf + 1, 0
-        at[i] = (x, y)
-        x += w + 1
-        shelf = max(shelf, h)
-    H = y + shelf + 1
-    page = np.zeros((H * 2, W, 4), np.uint8)   # the colours, and under them the notes
-    for i, (x, y) in at.items():
-        px, note = rects[i][:2]
-        page[y:y + px.shape[0], x:x + px.shape[1]] = px
-        page[H + y:H + y + px.shape[0], x:x + px.shape[1]] = note
-    file = f"stack_{name}.png"
-    write_png(os.path.join(OUT, file), page)
-    print(f"stack {name}: {len(rects)} slices on {W} x {H * 2}", flush=True)
-    # notes: how far below a slice its notes are. rects: x, y, width, height on the page, then x and y from the model's middle.
-    return dict(file=file, w=W, h=int(H * 2), notes=int(H), frames=nframes, sets=sets,
-                rects=[[at[i][0], at[i][1], rects[i][0].shape[1], rects[i][0].shape[0], rects[i][2], rects[i][3]] for i in range(len(rects))])
+        # Pack them on shelves, tallest first, with a clear pixel between (the map reads them unsmoothed).
+        order = sorted(range(len(rects)), key=lambda i: -rects[i][0].shape[0])
+        area = sum((rects[i][0].shape[0] + 2) * (rects[i][0].shape[1] + 2) for i in order)
+        W = 256 if area < 50_000 else 512 if area < 220_000 else 1024 if area < 900_000 else 2048
+        at, x, y, shelf = {}, 1, 1, 0
+        for i in order:
+            h, w = rects[i][0].shape[:2]
+            if x + w + 1 > W:
+                x, y, shelf = 1, y + shelf + 1, 0
+            at[i] = (x, y)
+            x += w + 1
+            shelf = max(shelf, h)
+        H = y + shelf + 1
+        page = np.zeros((H * 2, W, 4), np.uint8)   # the colours, and under them the notes
+        for i, (x, y) in at.items():
+            px, note = rects[i][:2]
+            page[y:y + px.shape[0], x:x + px.shape[1]] = px
+            page[H + y:H + y + px.shape[0], x:x + px.shape[1]] = note
+        file = f"stack_{name}_{r}.png"
+        write_png(os.path.join(OUT, file), page)
+        # notes: how far below a slice its notes are. rects: x, y, width, height on the page, then x and y from the model's middle.
+        sets.append(dict(r=r, n=tall, reach=round(reach / r, 3), half=[round(half[0] / r, 3), round(half[1] / r, 3)],
+                         file=file, w=W, h=int(H * 2), notes=int(H), frames=frames,
+                         rects=[[at[i][0], at[i][1], rects[i][0].shape[1], rects[i][0].shape[0], rects[i][2], rects[i][3]] for i in range(len(rects))]))
+        print(f"stack {name}: {r} to the map voxel, {tall} levels, {len(rects)} slices on {W} x {H * 2}", flush=True)
+    return dict(frames=nframes, sets=sets)
 
 
 def main():

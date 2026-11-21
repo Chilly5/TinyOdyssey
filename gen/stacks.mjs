@@ -11,16 +11,20 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-// Returns { name: { file, v, w, h, notes, frames, sets, rects } }, or null if none have been made.
-// v changes whenever the sheet does, so that a browser never pairs an old sheet with new slices.
+// Returns { name: { frames, sets: [{ r, n, reach, half, file, v, w, h, notes, frames, rects }] } }, or null if
+// none have been made. A set is one size of the model, with a sheet of its own; v changes whenever the sheet
+// does, so that a browser never pairs an old sheet with new slices.
 export function addStacks(out, unitDir) {
   const file = path.join(unitDir, 'stacks.json');
   if (!fs.existsSync(file)) return null;
   const stacks = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const f of fs.readdirSync(out)) if (/^stack_.*\.png$/.test(f)) fs.rmSync(path.join(out, f)); // none left over from another cut
   for (const st of Object.values(stacks)) {
-    const png = fs.readFileSync(path.join(unitDir, st.file));
-    fs.writeFileSync(path.join(out, st.file), png); // as written: half of it is notes kept as colours, which must stay exact
-    st.v = crypto.createHash('sha1').update(png).digest('hex').slice(0, 10);
+    for (const set of st.sets) {
+      const png = fs.readFileSync(path.join(unitDir, set.file));
+      fs.writeFileSync(path.join(out, set.file), png); // as written: half of it is notes kept as colours, which must stay exact
+      set.v = crypto.createHash('sha1').update(png).digest('hex').slice(0, 10);
+    }
   }
   return stacks;
 }
@@ -35,5 +39,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!stacks) throw new Error('no stacks: run units/stack.py in Blender first');
   man.stacks = stacks;
   fs.writeFileSync(mf, JSON.stringify(man));
-  for (const [name, st] of Object.entries(stacks)) console.log(`${name}: ${st.rects.length} slices, ${st.sets.map((s) => s.n).join(' / ')} levels, ${st.file} ${st.w} x ${st.h}`);
+  for (const [name, st] of Object.entries(stacks)) console.log(`${name}: ${st.frames} frame(s); ${st.sets.map((s) => `${s.n} levels, ${s.rects.length} slices on ${s.w} x ${s.h}`).join('; ')}`);
 }

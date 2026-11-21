@@ -146,7 +146,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
     return ok;
   };
   const SHIP_UNIT = { odysseus: 'odysseus', argo: 'argo', theseus: 'theseus', trader0: 'merchant_ship', trader1: 'merchant_ship2', trader2: 'trireme' };
-  const stacks = {}; // the ships kept as sprite stacks (units/stack.py), by kind, once their sheets have loaded
+  const stacks = {}; // the models kept as sprite stacks (units/stack.py), by the unit's name
 
   // --- Splashes ------------------------------------------------------------------
   const rings = Array.from({ length: 12 }, () => ({ t0: -10, x: 0, y: 0, size: 9 }));
@@ -176,7 +176,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
   const p = {};
   const ships = []; // every one of them, for the visitor to pick and follow: { id (if it has a name), target }
   function makeShip(kind, label) {
-    const ship = { kind, x: 0, y: 0, k: 0, moving: false, wake: [], last: null, target: { x: 0, y: 0 }, ph: rnd() * 6, course: 0, turn: null };
+    const ship = { kind, x: 0, y: 0, k: 0, moving: false, wake: [], last: null, target: { x: 0, y: 0 }, ph: rnd() * 6, course: 0, turn: null, pics: [] };
     ship.place = (path, dist, moving, dir = 1) => {
       const fromX = ship.x, fromY = ship.y;
       path.at(dist, p);
@@ -210,9 +210,14 @@ export function createActors(viewer, M, calm, base = 'world/') {
       // A ship is on the water, so a headland or an island nearer the camera hides it.
       const depth = viewer.depthOf(ship.y);
       // One kept as a sprite stack faces exactly the way it is going, and pulls a whole stroke of the oars
-      // (frame 0 has them shipped, for lying still).
-      const st = stacks[kind];
-      if (st && d.stack(st, ship.moving && !calm ? Math.floor((now * 0.85 + ship.ph) * st.frames) % st.frames : 0, ship.turn, ship.x, ship.y + bob, depth)) return;
+      // (frame 0 has them shipped, for lying still). Seen from far off the stroke is too small to show, and
+      // the oars are simply out.
+      const st = stacks[SHIP_UNIT[kind]];
+      if (st) {
+        const far = viewer.zoom * viewer.dpr < 1.2;
+        const f = !ship.moving || calm ? 0 : far ? st.frames >> 1 : Math.floor((now * 0.85 + ship.ph) * st.frames) % st.frames;
+        if (d.stack(st, f, ship.turn, ship.x, ship.y + bob, depth, ship.pics)) return;
+      }
       if (!unit(d, SHIP_UNIT[kind], ship.k, oars, ship.x, ship.y + bob, depth)) d.sprite(`${kind}_${ship.k}`, ship.x, ship.y + bob);
     });
     // It comes about over a moment, not at once: quickly enough to follow a winding course.
@@ -666,7 +671,7 @@ export function createActors(viewer, M, calm, base = 'world/') {
     onBolt: null, // called with the effect when lightning strikes (for the thunder)
     onSplash: null, // called with x, y and size whenever something hits the water
     setLife(l) { life = l; },
-    setStack(kind, st) { stacks[kind] = st; },
+    setStack(name, st) { stacks[name] = st; },
     update(t, dt) {
       now = t;
       for (const f of tickers) f(t, dt);
