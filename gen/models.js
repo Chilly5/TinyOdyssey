@@ -3,7 +3,7 @@
 //
 // A model unit is 56 map pixels, and the picture is drawn up to sixteen times finer than
 // that, so a figure two fifths of a unit tall can stand 350 pixels high. The parts are
-// shaped for that: limbs and heads are round, columns are fluted and carry capitals, a
+// shaped for that: people have block-avatar proportions, columns are fluted and carry capitals, a
 // temple has its steps, its door, its frieze and the figures in its pediment.
 
 import * as THREE from './three.js';
@@ -238,31 +238,27 @@ export function person(g, x, y, z, s = 0.4, o = {}) {
   const hem = shade(tunic, 0.76);
   const face = o.face ?? (skin === C.skin || skin === C.skinD);
   g.at(x, y, z, o.rot || 0, s, (q) => {
-    for (const sx of [-1, 1]) q.ball(sx * 0.078, 0.032, 0.04, 0.05, 0.032, 0.078, robe ? skin : shade(legs, 0.82), { seg: 7 }); // feet
-    if (robe) {
-      q.lathe(0, 0, 0, [[0.19, 0.03], [0.168, 0.25], [0.152, 0.45]], 12, legs, { sz: 0.68, bottom: true });
-      q.lathe(0, 0, 0, [[0.198, 0.03], [0.194, 0.062]], 12, hem, { sz: 0.68 });
-    } else {
-      for (const sx of [-1, 1]) q.limb([sx * 0.08, 0.05, 0], [sx * 0.086, 0.44, 0], 0.052, 0.074, legs, { sides: 8 });
-      q.lathe(0, 0, 0, [[0.19, 0.33], [0.158, 0.47]], 12, tunic, { sz: 0.7, bottom: true });
-      q.lathe(0, 0, 0, [[0.196, 0.325], [0.192, 0.35]], 12, hem, { sz: 0.7 });
+    // Match the Blender avatars: broad cuboid torso, two separate rectangular
+    // legs and a square head. Statues and flying sprites use this builder too.
+    for (const sx of [-1, 1]) {
+      q.box(sx * 0.084, 0.035, 0, 0.15, 0.35, 0.155, robe ? tunic : legs);
+      q.box(sx * 0.084, 0, 0.015, 0.153, 0.05, 0.18, shade(legs, 0.72));
     }
-    q.lathe(0, 0, 0, [[0.155, 0.43], [0.176, 0.56], [0.186, 0.66], [0.118, 0.735], [0.06, 0.75]], 12, tunic, { sz: 0.66 });
-    q.lathe(0, 0, 0, [[0.163, 0.44], [0.166, 0.474]], 12, o.belt || hem, { sz: 0.7 });
-    q.lathe(0, 0, 0, [[0.056, 0.73], [0.056, 0.775]], 8, skin);
-    q.ball(0, 0.852, 0.005, 0.125, 0.127, 0.125, skin, { seg: 12 });
-    if (o.hair !== null) q.ball(0, 0.878, -0.024, 0.136, 0.118, 0.136, o.hair || C.hair, { seg: 12 });
-    if (face && !o.eye) for (const sx of [-1, 1]) q.box(sx * 0.048, 0.84, 0.117, 0.026, 0.032, 0.012, C.dark);
-    if (o.beard) q.ball(0, 0.775, 0.082, 0.088, 0.075, 0.058, o.beard, { seg: 8 });
+    q.box(0, 0.36, 0, 0.33, 0.34, 0.19, tunic);
+    q.box(0, 0.39, 0, 0.34, 0.035, 0.20, o.belt || hem);
+    q.box(0, 0.69, 0, 0.105, 0.06, 0.105, skin);
+    q.box(0, 0.73, 0, 0.29, 0.255, 0.25, skin);
+    if (o.hair !== null) {
+      q.box(0, 0.955, 0, 0.30, 0.055, 0.26, o.hair || C.hair);
+      q.box(0, 0.79, -0.122, 0.295, 0.17, 0.025, o.hair || C.hair);
+    }
+    if (face && !o.eye) for (const sx of [-1, 1]) q.box(sx * 0.055, 0.865, 0.125, 0.027, 0.04, 0.012, C.dark);
+    if (face && !o.beard) q.box(0, 0.805, 0.125, 0.085, 0.014, 0.012, C.dark);
+    if (o.beard) q.box(0, 0.722, 0.125, 0.195, 0.10, 0.04, o.beard);
     if (!o.noArms) {
       const arm = (sx, up) => {
-        const sh = [sx * 0.2, 0.672, 0];
-        const el = up ? [sx * 0.275, 0.81, 0.02] : [sx * 0.25, 0.52, 0.012];
-        const ha = up ? [sx * 0.25, 0.99, 0.035] : [sx * 0.238, 0.385, 0.045];
-        q.ball(sh[0], sh[1], sh[2], 0.064, 0.064, 0.064, tunic, { seg: 8 });
-        q.limb(sh, el, 0.05, 0.043, skin, { sides: 8 });
-        q.limb(el, ha, 0.043, 0.036, skin, { sides: 8 });
-        q.ball(ha[0], ha[1], ha[2], 0.047, 0.047, 0.047, skin, { seg: 7 });
+        q.box(sx * 0.23, up ? 0.66 : 0.35, 0, 0.14, 0.34, 0.15, skin);
+        q.box(sx * 0.23, up ? 0.65 : 0.62, 0, 0.145, 0.075, 0.155, tunic);
       };
       arm(-1, !!o.armsUp);
       arm(1, !!(o.armsUp || o.rightUp));
@@ -287,8 +283,8 @@ export function person(g, x, y, z, s = 0.4, o = {}) {
       q.sheet([0.18, 0.44, -0.085], [0.45, 0.45, -0.15], [0.5, 0.8, -0.15], [0.18, 0.66, -0.085], inner);
     }
     if (o.eye) { // a single great eye
-      q.ball(0, 0.87, 0.105, 0.066, 0.056, 0.03, C.white, { seg: 9 });
-      q.ball(0, 0.868, 0.128, 0.03, 0.03, 0.014, C.dark, { seg: 7 });
+      q.box(0, 0.852, 0.125, 0.14, 0.075, 0.014, C.white);
+      q.box(0, 0.864, 0.135, 0.045, 0.05, 0.014, C.dark);
     }
     if (o.horns) {
       for (const sx of [-1, 1]) {

@@ -1,0 +1,978 @@
+{
+  "man": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "man: no UV map",
+      "hidden back-to-back faces: man (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "man",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "man": {
+        "verts": 160,
+        "faces": 120,
+        "tris": 240,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 20,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "man2": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "man2: no UV map",
+      "man2: duplicate verts=20 loose verts=0",
+      "hidden back-to-back faces: man2 (4 pairs) - delete to save tris",
+      "asset lowest point z=-0.0936 (not resting on ground plane z=0)"
+    ],
+    "ground_z": -0.0936,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "man2",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "man2": {
+        "verts": 316,
+        "faces": 246,
+        "tris": 484,
+        "ngons": 4,
+        "boundary_edges": 52,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 20,
+        "islands": 27,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 8,
+        "uv_maps": 0
+      }
+    }
+  },
+  "woman": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "woman: no UV map",
+      "woman: duplicate verts=20 loose verts=0",
+      "hidden back-to-back faces: woman (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "woman",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "woman": {
+        "verts": 222,
+        "faces": 156,
+        "tris": 324,
+        "ngons": 2,
+        "boundary_edges": 40,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 20,
+        "islands": 22,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "woman2": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "woman2: no UV map",
+      "woman2: duplicate verts=24 loose verts=0",
+      "hidden back-to-back faces: woman2 (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "woman2",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "woman2": {
+        "verts": 252,
+        "faces": 188,
+        "tris": 372,
+        "ngons": 2,
+        "boundary_edges": 48,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 24,
+        "islands": 23,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "farmer": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "farmer: no UV map",
+      "farmer: duplicate verts=20 loose verts=0",
+      "hidden back-to-back faces: farmer (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "farmer",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "farmer": {
+        "verts": 282,
+        "faces": 206,
+        "tris": 420,
+        "ngons": 4,
+        "boundary_edges": 52,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 20,
+        "islands": 26,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 8,
+        "uv_maps": 0
+      }
+    }
+  },
+  "farmer_work": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "farmer_work: no UV map",
+      "farmer_work: duplicate verts=20 loose verts=0",
+      "hidden back-to-back faces: farmer_work (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "farmer_work",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "farmer_work": {
+        "verts": 282,
+        "faces": 206,
+        "tris": 420,
+        "ngons": 4,
+        "boundary_edges": 52,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 20,
+        "islands": 26,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 8,
+        "uv_maps": 0
+      }
+    }
+  },
+  "shepherd": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "shepherd: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "shepherd": {
+        "verts": 284,
+        "faces": 246,
+        "tris": 432,
+        "ngons": 0,
+        "boundary_edges": 48,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 26,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "hoplite": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "hoplite: no UV map",
+      "hoplite: degenerate faces=1 zero-len edges=6",
+      "hoplite: duplicate verts=3 loose verts=0",
+      "hidden back-to-back faces: hoplite (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "hoplite",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "hoplite": {
+        "verts": 304,
+        "faces": 234,
+        "tris": 480,
+        "ngons": 6,
+        "boundary_edges": 12,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 1,
+        "zero_length_edges": 6,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 3,
+        "islands": 30,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 8,
+        "uv_maps": 0
+      }
+    }
+  },
+  "boy": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "boy: no UV map",
+      "hidden back-to-back faces: boy (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "boy",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "boy": {
+        "verts": 160,
+        "faces": 120,
+        "tris": 240,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 20,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "girl": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "girl: no UV map",
+      "hidden back-to-back faces: girl (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "girl",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "girl": {
+        "verts": 168,
+        "faces": 126,
+        "tris": 252,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 21,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "elder": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "elder: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "elder": {
+        "verts": 222,
+        "faces": 196,
+        "tris": 352,
+        "ngons": 0,
+        "boundary_edges": 12,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 21,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "elder_woman": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "elder_woman: no UV map",
+      "elder_woman: duplicate verts=24 loose verts=0",
+      "hidden back-to-back faces: elder_woman (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "elder_woman",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "elder_woman": {
+        "verts": 260,
+        "faces": 194,
+        "tris": 384,
+        "ngons": 2,
+        "boundary_edges": 48,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 24,
+        "islands": 24,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 8,
+        "uv_maps": 0
+      }
+    }
+  },
+  "archer": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "archer: no UV map",
+      "hidden back-to-back faces: archer (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "archer",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "archer": {
+        "verts": 240,
+        "faces": 180,
+        "tris": 360,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 30,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "priest": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "priest: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "priest": {
+        "verts": 230,
+        "faces": 202,
+        "tris": 364,
+        "ngons": 0,
+        "boundary_edges": 12,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 22,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "merchant": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "merchant: no UV map",
+      "merchant: duplicate verts=20 loose verts=0"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "merchant": {
+        "verts": 222,
+        "faces": 146,
+        "tris": 324,
+        "ngons": 4,
+        "boundary_edges": 40,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 20,
+        "islands": 22,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "runner": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "runner: no UV map",
+      "hidden back-to-back faces: runner (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "runner",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "runner": {
+        "verts": 152,
+        "faces": 114,
+        "tris": 228,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 19,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 5,
+        "uv_maps": 0
+      }
+    }
+  },
+  "dancer": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "dancer: no UV map",
+      "hidden back-to-back faces: dancer (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "dancer",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "dancer": {
+        "verts": 152,
+        "faces": 114,
+        "tris": 228,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 19,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 5,
+        "uv_maps": 0
+      }
+    }
+  },
+  "bard": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "bard: no UV map",
+      "bard: degenerate faces=8 zero-len edges=40",
+      "bard: duplicate verts=44 loose verts=0"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "bard": {
+        "verts": 446,
+        "faces": 368,
+        "tris": 680,
+        "ngons": 18,
+        "boundary_edges": 84,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 8,
+        "zero_length_edges": 40,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 44,
+        "islands": 37,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "heracles": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "heracles: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "heracles": {
+        "verts": 296,
+        "faces": 262,
+        "tris": 468,
+        "ngons": 0,
+        "boundary_edges": 28,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 26,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "satyr": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "satyr: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "satyr": {
+        "verts": 388,
+        "faces": 354,
+        "tris": 600,
+        "ngons": 0,
+        "boundary_edges": 72,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 32,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "cyclops": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "cyclops: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "cyclops": {
+        "verts": 272,
+        "faces": 244,
+        "tris": 432,
+        "ngons": 0,
+        "boundary_edges": 28,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 23,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "talos": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "talos: no UV map",
+      "hidden back-to-back faces: talos (4 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "talos",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "talos": {
+        "verts": 192,
+        "faces": 144,
+        "tris": 288,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 24,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 5,
+        "uv_maps": 0
+      }
+    }
+  },
+  "harpy": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "harpy: no UV map",
+      "hidden back-to-back faces: harpy (12 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "harpy",
+        "tri_pairs": 12
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "harpy": {
+        "verts": 184,
+        "faces": 138,
+        "tris": 276,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 23,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  }
+}

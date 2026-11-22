@@ -30,6 +30,7 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8',
 const world = path.join(root, arg('world', 'world'));
 if (!fs.existsSync(path.join(world, 'manifest.json'))) throw new Error(`${world} has no manifest.json: build the world first`);
 const remote = git(root, 'remote', 'get-url', arg('remote', 'origin'));
+const previousSite = git(root, 'ls-remote', remote, 'refs/heads/gh-pages').split(/\s/)[0];
 // https://github.com/owner/name(.git) or git@github.com:owner/name(.git) -> https://owner.github.io/name/
 const m = remote.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
 const cname = path.join(root, 'CNAME');
@@ -45,6 +46,14 @@ for (const e of fs.readdirSync(dist)) if (e !== '.git') fs.rmSync(path.join(dist
 for (const f of ['index.html', 'preview.jpg', 'favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'icon-512.png', '.nojekyll', 'CNAME']) if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(dist, f));
 fs.cpSync(path.join(root, 'src'), path.join(dist, 'src'), { recursive: true });
 fs.cpSync(world, path.join(dist, 'world'), { recursive: true });
+// Publish only finished films and their viewing page, not Blender sources or render frames.
+const films = path.join(root, 'shorts');
+if (fs.existsSync(films)) {
+  fs.mkdirSync(path.join(dist, 'shorts'), { recursive: true });
+  for (const f of fs.readdirSync(films)) {
+    if (/\.(html|mp4|jpg|srt|vtt)$/.test(f)) fs.copyFileSync(path.join(films, f), path.join(dist, 'shorts', f));
+  }
+}
 if (site) { // link previews want whole addresses
   const page = path.join(dist, 'index.html');
   fs.writeFileSync(page, fs.readFileSync(page, 'utf8')
@@ -72,7 +81,7 @@ git(dist, 'update-ref', 'refs/heads/gh-pages', commit);
 if (process.argv.includes('--dry')) {
   console.log(`dry run: not pushed. Would publish to ${site || remote}`);
 } else {
-  execFileSync('git', ['push', '--force', remote, 'gh-pages'], { cwd: dist, stdio: 'inherit' });
+  execFileSync('git', ['push', `--force-with-lease=refs/heads/gh-pages:${previousSite}`, remote, 'gh-pages'], { cwd: dist, stdio: 'inherit' });
   // What the last site had and this one has not is no longer wanted here either.
   try { git(dist, 'reflog', 'expire', '--expire=now', '--all'); git(dist, 'gc', '-q', '--prune=now'); } catch { /* it will be tidied next time */ }
   console.log(site ? `Published. It will be at ${site} in a minute or two.` : 'Published.');

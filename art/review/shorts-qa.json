@@ -1,0 +1,923 @@
+{
+  "Odysseus": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Odysseus: no UV map",
+      "asset lowest point z=0.117 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 0.117,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "Odysseus": {
+        "verts": 152,
+        "faces": 114,
+        "tris": 228,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 19,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "Polyphemus": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Polyphemus: no UV map",
+      "hidden back-to-back faces: Polyphemus (2 pairs) - delete to save tris"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "Polyphemus",
+        "tri_pairs": 2
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "Polyphemus": {
+        "verts": 152,
+        "faces": 114,
+        "tris": 228,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 19,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 7,
+        "uv_maps": 0
+      }
+    }
+  },
+  "Neighbour": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Neighbour: no UV map"
+    ],
+    "ground_z": 0.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "Neighbour": {
+        "verts": 144,
+        "faces": 108,
+        "tris": 216,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 18,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  },
+  "Icarus": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Icarus: no UV map",
+      "Icarus attached feather: no UV map",
+      "Icarus attached feather.001: no UV map",
+      "Icarus attached feather.002: no UV map",
+      "Icarus attached feather.003: no UV map",
+      "Icarus attached feather.004: no UV map",
+      "Icarus attached feather.005: no UV map",
+      "Icarus attached feather.006: no UV map",
+      "Icarus attached feather.007: no UV map",
+      "Icarus attached feather.008: no UV map",
+      "Icarus attached feather.009: no UV map",
+      "Icarus attached feather.010: no UV map",
+      "Icarus attached feather.011: no UV map",
+      "hidden back-to-back faces: Icarus attached feather.010<->Icarus attached feather.011 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.003<->Icarus attached feather.004 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.002<->Icarus attached feather.003 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather<->Icarus attached feather.001 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.009<->Icarus attached feather.010 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.007<->Icarus attached feather.008 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.006<->Icarus attached feather.007 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.004<->Icarus attached feather.005 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.001<->Icarus attached feather.002 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Icarus attached feather.008<->Icarus attached feather.009 (4 pairs) - delete to save tris",
+      "asset lowest point z=5.5 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 5.5,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "Icarus attached feather.010<->Icarus attached feather.011",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.003<->Icarus attached feather.004",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.002<->Icarus attached feather.003",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather<->Icarus attached feather.001",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.009<->Icarus attached feather.010",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.007<->Icarus attached feather.008",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.006<->Icarus attached feather.007",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.004<->Icarus attached feather.005",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.001<->Icarus attached feather.002",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Icarus attached feather.008<->Icarus attached feather.009",
+        "tri_pairs": 4
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "Icarus": {
+        "verts": 160,
+        "faces": 120,
+        "tris": 240,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 20,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      },
+      "Icarus attached feather": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.001": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.002": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.003": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.004": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.005": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.006": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.007": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.008": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.009": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.010": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Icarus attached feather.011": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      }
+    }
+  },
+  "Daedalus": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Daedalus: no UV map",
+      "Daedalus attached feather: no UV map",
+      "Daedalus attached feather.001: no UV map",
+      "Daedalus attached feather.002: no UV map",
+      "Daedalus attached feather.003: no UV map",
+      "Daedalus attached feather.004: no UV map",
+      "Daedalus attached feather.005: no UV map",
+      "Daedalus attached feather.006: no UV map",
+      "Daedalus attached feather.007: no UV map",
+      "Daedalus attached feather.008: no UV map",
+      "Daedalus attached feather.009: no UV map",
+      "Daedalus attached feather.010: no UV map",
+      "Daedalus attached feather.011: no UV map",
+      "hidden back-to-back faces: Daedalus attached feather<->Daedalus attached feather.001 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.004<->Daedalus attached feather.005 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.006<->Daedalus attached feather.007 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.002<->Daedalus attached feather.003 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.009<->Daedalus attached feather.010 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.008<->Daedalus attached feather.009 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.001<->Daedalus attached feather.002 (4 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.003<->Daedalus attached feather.004 (2 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.010<->Daedalus attached feather.011 (2 pairs) - delete to save tris",
+      "hidden back-to-back faces: Daedalus attached feather.007<->Daedalus attached feather.008 (2 pairs) - delete to save tris",
+      "asset lowest point z=5.0 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 5.0,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [
+      {
+        "where": "Daedalus attached feather<->Daedalus attached feather.001",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.004<->Daedalus attached feather.005",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.006<->Daedalus attached feather.007",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.002<->Daedalus attached feather.003",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.009<->Daedalus attached feather.010",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.008<->Daedalus attached feather.009",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.001<->Daedalus attached feather.002",
+        "tri_pairs": 4
+      },
+      {
+        "where": "Daedalus attached feather.003<->Daedalus attached feather.004",
+        "tri_pairs": 2
+      },
+      {
+        "where": "Daedalus attached feather.010<->Daedalus attached feather.011",
+        "tri_pairs": 2
+      },
+      {
+        "where": "Daedalus attached feather.007<->Daedalus attached feather.008",
+        "tri_pairs": 2
+      }
+    ],
+    "enclosed": [],
+    "objects": {
+      "Daedalus": {
+        "verts": 144,
+        "faces": 108,
+        "tris": 216,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 18,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.001": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.002": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.003": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.004": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.005": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.006": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.007": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.008": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.009": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.010": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      },
+      "Daedalus attached feather.011": {
+        "verts": 8,
+        "faces": 6,
+        "tris": 12,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 1,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "uv_maps": 0
+      }
+    }
+  },
+  "Sisyphus": {
+    "ok": true,
+    "pass": true,
+    "errors": [],
+    "warnings": [
+      "Sisyphus: no UV map",
+      "asset lowest point z=7.2644 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 7.2644,
+    "zfighting": [],
+    "floating": [],
+    "back_to_back": [],
+    "enclosed": [],
+    "objects": {
+      "Sisyphus": {
+        "verts": 144,
+        "faces": 108,
+        "tris": 216,
+        "ngons": 0,
+        "boundary_edges": 0,
+        "nonmanifold_edges": 0,
+        "wire_edges": 0,
+        "loose_verts": 0,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 0,
+        "duplicate_verts": 0,
+        "islands": 18,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 6,
+        "uv_maps": 0
+      }
+    }
+  }
+}

@@ -347,17 +347,15 @@ def penelope(k):
 
 def cyclops_body(k):
     """Polyphemus, a unit tall, facing -y (the viewer), without the arm he throws with: that is cyclops_arm,
-    hung from the shoulder at x = +0.216, z = 0.693 and swung by the landmark's own animation."""
+    hung from the shoulder at x = 3.65/16.1, z = 10.6/16.1 and swung by the landmark's own animation."""
     k.figure(dict(tunic="hide", chest="tan", skin="tan", sleeve="tan", eye1=True, hair="hair", beard="hair", belt="wood2", still=True, noarm=1), 1.0, (0, 0, 0), turn=-90)
 
 
 def cyclops_arm(k):
     """His throwing arm, hanging from the origin: upper arm, forearm and an open hand to hold a boulder."""
     tan = "#b9794e"
-    k.tube([(0, 0, 0), (0.0, -0.012, -0.17)], 0.058, tan, sides=8)
-    k.tube([(0.0, -0.012, -0.17), (0.0, -0.03, -0.315)], 0.047, tan, sides=8)
-    k.ball(0.062, (0, 0, 0), tan, seg=10, rings=6)
-    k.ball((0.052, 0.05, 0.056), (0.0, -0.034, -0.35), tan, seg=10, rings=6)
+    k.box((0.14, 0.147, 0.35), (0, 0, -0.14), tan)
+    k.box((0.142, 0.15, 0.062), (0, -0.003, -0.335), tan)
 
 
 def bird_body(k):

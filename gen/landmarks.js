@@ -691,7 +691,7 @@ export const MODELS = {
     const body = L.fx.mesh(L.group, asset(new Geo(), 'cyclops_body', 0, 0, 0, 0, k), { shadow: true });
     body.position.set(0.15, 0, 0.1);
     const arm = new THREE.Group();
-    arm.position.set(0.216 * k, 0.693 * k, 0);
+    arm.position.set((3.65 / 16.1) * k, (10.6 / 16.1) * k, 0);
     body.add(arm);
     L.fx.mesh(arm, asset(new Geo(), 'cyclops_arm', 0, 0, 0, 0, k), { shadow: true });
     const rockGeo = new Geo().blob(0, 0, 0, 0.26, 0.22, 0.24, C.rockD, { dark: rgb('#5a546e') }).build();

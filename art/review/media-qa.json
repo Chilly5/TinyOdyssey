@@ -1,0 +1,44 @@
+{
+  "nobody": {
+    "pass": true,
+    "width": 1080,
+    "height": 1920,
+    "fps": 24,
+    "frames": 856,
+    "seconds": 35.66,
+    "codec": "h264",
+    "pixel_format": "yuv420p(progressive)",
+    "bytes": 7345412,
+    "loudness_lufs": -16.3,
+    "true_peak_dbfs": -1.6,
+    "full_decode_exit": 0
+  },
+  "icarus": {
+    "pass": true,
+    "width": 1080,
+    "height": 1920,
+    "fps": 24,
+    "frames": 849,
+    "seconds": 35.37,
+    "codec": "h264",
+    "pixel_format": "yuv420p(progressive)",
+    "bytes": 6741059,
+    "loudness_lufs": -15.8,
+    "true_peak_dbfs": -1.5,
+    "full_decode_exit": 0
+  },
+  "sisyphus": {
+    "pass": true,
+    "width": 1080,
+    "height": 1920,
+    "fps": 24,
+    "frames": 902,
+    "seconds": 37.58,
+    "codec": "h264",
+    "pixel_format": "yuv420p(progressive)",
+    "bytes": 5423247,
+    "loudness_lufs": -15.9,
+    "true_peak_dbfs": -1.5,
+    "full_decode_exit": 0
+  }
+}

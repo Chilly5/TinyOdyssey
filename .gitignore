@@ -14,3 +14,9 @@ units/anims/
 
 units/out/
 __pycache__/
+
+# Reproducible render intermediates and the pre-edit safety copy.
+art/review/before-session.blend
+art/review/build-logs/
+*.blend1
+shorts/work/

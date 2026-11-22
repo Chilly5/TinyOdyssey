@@ -1,0 +1,44 @@
+[
+  {
+    "id": "nobody", "number": "01", "title": "NOBODY DID IT", "subtitle": "ODYSSEUS vs. THE CYCLOPS", "place": "CAVE OF THE CYCLOPS", "color": "#FFD166", "voice": "en-US-GuyNeural",
+    "source": "https://www.theoi.com/Text/HomerOdyssey9.html",
+    "beats": [
+      ["THE WORST AIRBNB\nIN ANCIENT GREECE", "Odysseus found the worst Airbnb in Greek mythology."],
+      ["ONE GIANT.\nZERO EXITS.", "The Cyclops trapped his crew inside. Then asked his name."],
+      ["MY NAME?\nNOBODY.", "Nobody, said Odysseus. Great username. Terrible search result."],
+      ["NOBODY\nIS HURTING ME!", "They blinded the giant while he slept. He yelled: Nobody is hurting me!"],
+      ["SUPPORT TICKET:\nCLOSED.", "His neighbours heard that and left. Customer support: ticket closed."],
+      ["SHEEP: THE ORIGINAL\nGETAWAY VEHICLE", "The crew escaped under his sheep. The plan actually worked."],
+      ["HE TOLD HIM\nHIS REAL NAME.", "Then Odysseus shouted his real name. The giant called his dad: Poseidon."],
+      ["STEALTH: 10/10\nEXIT INTERVIEW: 0/10", "Stealth: ten out of ten. Exit interview: zero."]
+    ]
+  },
+  {
+    "id": "icarus", "number": "02", "title": "FLIGHT MODE", "subtitle": "ICARUS IGNORES THE TUTORIAL", "place": "CRETE / THE ICARIAN SEA", "color": "#71E3E0", "voice": "en-US-GuyNeural",
+    "source": "https://www.theoi.com/Text/OvidMetamorphoses8.html",
+    "beats": [
+      ["HE SKIPPED\nTHE FLIGHT TUTORIAL.", "Icarus got wings. Immediately skipped the tutorial."],
+      ["FEATHERS + WAX\nWHAT COULD GO WRONG?", "His dad, Daedalus, built wings from feathers and wax to escape Crete."],
+      ["DAD: STAY\nIN THE MIDDLE.", "The rule was simple: not too low, not too close to the sun."],
+      ["ICARUS:\nBUT THE VIEW THOUGH", "Icarus loved flying. So he climbed. And climbed. And climbed."],
+      ["WAX INTEGRITY:\n1%", "The sun softened the wax. His feathers started coming loose."],
+      ["FLIGHT MODE\nDISCONNECTED", "No feathers. No lift. Icarus fell into the sea."],
+      ["THE WARNING\nWASN'T A SUGGESTION.", "Daedalus lost his son. The Icarian Sea remembers his name."],
+      ["ANCIENT GREECE:\nNO RESPAWN BUTTON", "Ancient Greece had no respawn button. Read the tutorial."]
+    ]
+  },
+  {
+    "id": "sisyphus", "number": "03", "title": "ALMOST THERE", "subtitle": "SISYPHUS vs. THE PROGRESS BAR", "place": "CORINTH / THE UNDERWORLD", "color": "#DAACFF", "voice": "en-US-GuyNeural",
+    "source": "https://www.theoi.com/Text/HomerOdyssey11.html",
+    "beats": [
+      ["YOUR DOWNLOAD\nHAS REACHED 99%", "Your download hits ninety-nine percent. Meet Sisyphus."],
+      ["ONE ROCK.\nONE VERY LONG SHIFT.", "His punishment: push a massive stone up a hill. Forever."],
+      ["PROGRESS:\n47%", "He leans in. Every muscle working. The summit gets closer."],
+      ["PROGRESS:\n99%", "One last push. This is it. Surely this is it."],
+      ["CONNECTION LOST.", "Nope. The stone rolls all the way back down."],
+      ["AUTOSAVE:\nNEVER HEARD OF IT", "No checkpoint. No autosave. Just him, the hill, and the rock."],
+      ["RETRY?\nRETRY.", "So he walks back down. Puts his hands on it. Starts again."],
+      ["GREEK MYTHOLOGY\nINVENTED THE GRIND", "Greek mythology invented the grind. Unfortunately, the rewards are terrible."]
+    ]
+  }
+]
